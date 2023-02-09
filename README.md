@@ -1,0 +1,1 @@
+# ftm-gas-monetization
