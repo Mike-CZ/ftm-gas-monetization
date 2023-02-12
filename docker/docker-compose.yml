@@ -1,0 +1,11 @@
+# Services setup for local development
+services:
+  mongodb:
+    image: mongo:6.0
+    ports:
+      - "127.0.0.1:27017:27017"  # expose only for localhost interface
+    volumes:
+      - ./.data/mongodb:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=root
