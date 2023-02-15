@@ -2,8 +2,7 @@
 package main
 
 import (
-	"fmt"
-	"github.com/Mike-CZ/ftm-gas-monetization/cmd/gas-monetization-cli/flags"
+	"github.com/Mike-CZ/ftm-gas-monetization/cmd/gas-monetization-cli/gas-monetization"
 	"log"
 	"os"
 
@@ -15,12 +14,8 @@ func initApp() *cli.App {
 		Name:     "FTM Gas Monetization",
 		HelpName: "gas-monetization",
 		Usage:    "starts observing blocks and accumulating pending rewards for white-listed addresses",
-		Flags: []cli.Flag{
-			&flags.OperaRpcUrl,
-		},
-		Action: func(*cli.Context) error {
-			fmt.Println("boom! I say!")
-			return nil
+		Commands: []*cli.Command{
+			&gas_monetization.CmdRun,
 		},
 	}
 }
