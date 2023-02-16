@@ -16,6 +16,7 @@ func initApp() *cli.App {
 		Usage:    "starts observing blocks and accumulating pending rewards for white-listed addresses",
 		Commands: []*cli.Command{
 			&gas_monetization.CmdRun,
+			&gas_monetization.CmdConfig,
 		},
 	}
 }

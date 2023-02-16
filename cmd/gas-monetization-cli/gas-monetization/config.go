@@ -2,48 +2,30 @@
 package gas_monetization
 
 import (
+	"encoding/json"
+	"github.com/Mike-CZ/ftm-gas-monetization/cmd/gas-monetization-cli/flags"
+	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
+	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
 	"github.com/urfave/cli/v2"
-	"os"
 )
 
-var configCommand = cli.Command{
+var CmdConfig = cli.Command{
 	Name:  "config",
-	Usage: "output default config",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:   "node-id",
-			Usage:  "node id",
-			Value:  getHostname(),
-			EnvVar: "STELLAR_CONFIG_NODE_ID",
-		},
-		cli.StringFlag{
-			Name:   "nic, n",
-			Usage:  "network interface to use for detecting IP (default: first non-local)",
-			EnvVar: "STELLAR_CONFIG_NIC",
-		},
-		cli.StringSliceFlag{
-			Name:   "peer, p",
-			Usage:  "peer(s) to configure for joining",
-			Value:  &cli.StringSlice{},
-			EnvVar: "STELLAR_CONFIG_PEERS",
-		},
-		cli.StringFlag{
-			Name:   "namespace",
-			Usage:  "containerd namespace",
-			Value:  "default",
-			EnvVar: "CONTAINERD_NAMESPACE",
-		},
-	},
+	Usage: "Prints default config",
 	Action: func(ctx *cli.Context) error {
-		cfg, err := defaultConfig(ctx)
-		if err != nil {
-			return err
-		}
-		enc := json.NewEncoder(os.Stdout)
+		cfg := loadConfig(ctx)
+		enc := json.NewEncoder(ctx.App.Writer)
 		enc.SetIndent("", "    ")
 		if err := enc.Encode(cfg); err != nil {
 			return err
 		}
 		return nil
 	},
+}
+
+func loadConfig(ctx *cli.Context) *config.Config {
+	return &config.Config{
+		LoggingLevel: logger.ParseLevel(ctx.String(flags.LogLevel.Name)),
+		OperaRpcUrl:  ctx.String(flags.OperaRpcUrl.Name),
+	}
 }

@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"github.com/Mike-CZ/ftm-gas-monetization/cmd/gas-monetization-cli/flags"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/app"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
 	"github.com/urfave/cli/v2"
 )
 
@@ -21,12 +19,8 @@ var CmdRun = cli.Command{
 }
 
 func run(ctx *cli.Context) error {
-	cfg := config.Config{
-		LoggingLevel: logger.ParseLevel(ctx.String(flags.LogLevel.Name)),
-		OperaRpcUrl:  ctx.String(flags.OperaRpcUrl.Name),
-	}
-
-	app.Bootstrap(ctx, &cfg)
+	cfg := loadConfig(ctx)
+	app.Bootstrap(ctx, cfg)
 
 	res, err := app.Repository().GetHeader(1)
 	if err != nil {

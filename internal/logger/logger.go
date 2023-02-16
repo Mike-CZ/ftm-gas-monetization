@@ -1,25 +1,44 @@
 package logger
 
 import (
+	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
 	"github.com/op/go-logging"
-	"io"
+	"github.com/urfave/cli/v2"
+	"strings"
 )
 
 // defaultLogFormat defines the format used for log output.
 const defaultLogFormat = "%{color}%{level:-8s} %{shortpkg}/%{shortfunc}%{color:reset}: %{message}"
 
+// AppLogger defines extended logger with generic no-level logging option
+type AppLogger struct {
+	logging.Logger
+}
+
+// ModuleLogger provides a new instance of the Logger for a module.
+func (l *AppLogger) ModuleLogger(module string) *AppLogger {
+	var sb strings.Builder
+	sb.WriteString(l.Module)
+	sb.WriteString(".")
+	sb.WriteString(module)
+	log := logging.MustGetLogger(sb.String())
+	return &AppLogger{Logger: *log}
+}
+
 // New provides a new instance of the Logger based on output writer, logging level and module.
-func New(out io.Writer, lvl logging.Level, module string) *logging.Logger {
-	backend := logging.NewLogBackend(out, "", 0)
+func New(ctx *cli.Context, cfg *config.Config) *AppLogger {
+	backend := logging.NewLogBackend(ctx.App.Writer, "", 0)
 
 	fm := logging.MustStringFormatter(defaultLogFormat)
 	fmtBackend := logging.NewBackendFormatter(backend, fm)
 
 	lvlBackend := logging.AddModuleLevel(fmtBackend)
-	lvlBackend.SetLevel(lvl, "")
+	lvlBackend.SetLevel(cfg.LoggingLevel, "")
 
 	logging.SetBackend(lvlBackend)
-	return logging.MustGetLogger(module)
+	l := logging.MustGetLogger(ctx.App.Name)
+
+	return &AppLogger{Logger: *l}
 }
 
 // ParseLevel parses a string into a logging.Level. If the string is not a valid

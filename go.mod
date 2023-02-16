@@ -3,9 +3,9 @@ module github.com/Mike-CZ/ftm-gas-monetization
 go 1.20
 
 require (
-	github.com/urfave/cli/v2 v2.24.3
 	github.com/ethereum/go-ethereum v1.10.26
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
+	github.com/urfave/cli/v2 v2.24.3
 )
 
 require (
