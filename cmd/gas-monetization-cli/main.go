@@ -11,7 +11,7 @@ import (
 
 func initApp() *cli.App {
 	return &cli.App{
-		Name:     "FTM Gas Monetization",
+		Name:     "Gas Monetization App",
 		HelpName: "gas-monetization",
 		Usage:    "starts observing blocks and accumulating pending rewards for white-listed addresses",
 		Commands: []*cli.Command{

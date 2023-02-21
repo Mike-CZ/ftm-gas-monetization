@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/Mike-CZ/ftm-gas-monetization/cmd/gas-monetization-cli/flags"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/app"
+	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
 	"github.com/urfave/cli/v2"
 )
 
@@ -19,7 +20,7 @@ var CmdRun = cli.Command{
 }
 
 func run(ctx *cli.Context) error {
-	cfg := loadConfig(ctx)
+	cfg := config.LoadFromCli(ctx)
 	app.Bootstrap(ctx, cfg)
 
 	res, err := app.Repository().GetHeader(1)

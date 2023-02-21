@@ -8,6 +8,12 @@ import (
 const (
 	// blockQueueCapacity represents the capacity of block headers processor queue
 	blockQueueCapacity = 5000
+
+	// scanTickFrequency is the time delay for the regular scanner
+	scanTickFrequency = 4 * time.Millisecond
+
+	// topUpdateTickFrequency is the time delay for the block head update
+	topUpdateTickFrequency = 5 * time.Second
 )
 
 // blkScanner represents a scanner of historical data from the blockchain.
@@ -74,4 +80,61 @@ func (bs *blkScanner) name() string {
 // close signals the block observer to terminate
 func (bs *blkScanner) close() {
 	bs.sigStop <- true
+}
+
+// run scans past blocks one by one until it reaches top
+// after the top is reached, it idles and checks the head state to make sure
+// the API server keeps up with the most recent block
+func (bs *blkScanner) run() {
+	// make tickers
+	topTick := time.NewTicker(topUpdateTickFrequency)
+	bs.scanTicker = time.NewTicker(scanTickFrequency)
+
+	// make sure to stop the tickers and notify the manager
+	defer func() {
+		topTick.Stop()
+		bs.scanTicker.Stop()
+		bs.mgr.closed(bs)
+	}()
+
+	for {
+		// make sure to check for terminate; but do not stay in
+		select {
+		case <-bs.sigStop:
+			return
+
+		case <-topTick.C:
+			//bs.target = bs.top()
+			//bs.notify()
+
+		case bid, ok := <-bs.inObservedBlocks:
+			if !ok {
+				return
+			}
+
+			// we just casually follow the chain head
+			//if bs.state == blkIsIdling && bid > bs.current {
+			//	bs.current = bid
+			//	bs.lastProcessedBlock = bid
+			//	continue
+			//}
+
+			// we rush to catch the head, so we don't accept processed blocks above scanner head
+			if bid > bs.lastProcessedBlock && bid <= bs.current {
+				bs.lastProcessedBlock = bid
+			}
+
+		//case bid, ok := <-bs.inRescanBlocks:
+		//	if !ok {
+		//		return
+		//	}
+		//	bs.rescan(bid)
+
+		case <-bs.scanTicker.C:
+		}
+
+		//bs.next()
+		//bs.checkTarget()
+		//bs.checkIdle()
+	}
 }

@@ -4,6 +4,8 @@ go 1.20
 
 require (
 	github.com/ethereum/go-ethereum v1.10.26
+	github.com/jmoiron/sqlx v1.3.5
+	github.com/lib/pq v1.2.0
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/urfave/cli/v2 v2.24.3
 )

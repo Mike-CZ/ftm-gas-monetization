@@ -3,10 +3,10 @@
 package rpc
 
 import (
+	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	client "github.com/ethereum/go-ethereum/rpc"
-	"log"
 )
 
 const (
@@ -17,19 +17,25 @@ const (
 // Rpc represents the implementation of the Blockchain interface for Fantom Opera node.
 type Rpc struct {
 	ftm *ethclient.Client
+	log *logger.AppLogger
+
 	// captured header queue
 	headers chan *types.Header
 }
 
 // New creates a new instance of the RPC client.
-func New(url string) *Rpc {
+func New(url string, log *logger.AppLogger) *Rpc {
+	rpcLogger := log.ModuleLogger("rpc")
+
 	c, err := connect(url)
 	if err != nil {
-		log.Fatalf("can not connect to the Opera node; %s", err.Error())
+		rpcLogger.Criticalf("can not connect to the Opera node; %s", err.Error())
+		return nil
 	}
 
 	rpc := &Rpc{
 		ftm:     ethclient.NewClient(c),
+		log:     rpcLogger,
 		headers: make(chan *types.Header, headerObserverCapacity),
 	}
 

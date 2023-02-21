@@ -1,9 +1,8 @@
 package logger
 
 import (
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
 	"github.com/op/go-logging"
-	"github.com/urfave/cli/v2"
+	"io"
 	"strings"
 )
 
@@ -25,18 +24,18 @@ func (l *AppLogger) ModuleLogger(module string) *AppLogger {
 	return &AppLogger{Logger: *log}
 }
 
-// New provides a new instance of the Logger based on output writer, logging level and module.
-func New(ctx *cli.Context, cfg *config.Config) *AppLogger {
-	backend := logging.NewLogBackend(ctx.App.Writer, "", 0)
+// New provides a new instance of the Logger.
+func New(out io.Writer, module string, lvl logging.Level) *AppLogger {
+	backend := logging.NewLogBackend(out, "", 0)
 
 	fm := logging.MustStringFormatter(defaultLogFormat)
 	fmtBackend := logging.NewBackendFormatter(backend, fm)
 
 	lvlBackend := logging.AddModuleLevel(fmtBackend)
-	lvlBackend.SetLevel(cfg.LoggingLevel, "")
+	lvlBackend.SetLevel(lvl, "")
 
 	logging.SetBackend(lvlBackend)
-	l := logging.MustGetLogger(ctx.App.Name)
+	l := logging.MustGetLogger(module)
 
 	return &AppLogger{Logger: *l}
 }
