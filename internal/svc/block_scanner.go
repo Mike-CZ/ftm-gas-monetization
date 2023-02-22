@@ -1,6 +1,8 @@
 package svc
 
 import (
+	"github.com/Mike-CZ/ftm-gas-monetization/internal/app"
+	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
 	"github.com/ethereum/go-ethereum/core/types"
 	"time"
 )
@@ -14,10 +16,16 @@ const (
 
 	// topUpdateTickFrequency is the time delay for the block head update
 	topUpdateTickFrequency = 5 * time.Second
+
+	// blkScannerHysteresis represent the number of blocks we let slide
+	// until we switch back to active scan state.
+	blkScannerHysteresis = 10
 )
 
 // blkScanner represents a scanner of historical data from the blockchain.
 type blkScanner struct {
+	log *logger.AppLogger
+
 	// mgr represents the Manager instance
 	mgr *Manager
 
@@ -52,8 +60,9 @@ type blkScanner struct {
 }
 
 // newBlkScanner creates a new instance of the block scanner service.
-func newBlkScanner(mgr *Manager) *blkScanner {
+func newBlkScanner(mgr *Manager, log *logger.AppLogger) *blkScanner {
 	return &blkScanner{
+		log:       log.ModuleLogger("block_scanner"),
 		mgr:       mgr,
 		sigStop:   make(chan bool, 1),
 		outBlocks: make(chan *types.Header, blockQueueCapacity),
@@ -137,4 +146,19 @@ func (bs *blkScanner) run() {
 		//bs.checkTarget()
 		//bs.checkIdle()
 	}
+}
+
+// startBlock provides the starting block for the scanner
+func (bs *blkScanner) startBlock() uint64 {
+	lb, err := app.Repository().LastBlock()
+	if err != nil {
+		bs.log.Criticalf("can not pull last seen block; %s", err.Error())
+		return 0
+	}
+
+	if lb <= blkScannerHysteresis {
+		return lb
+	}
+
+	return lb - blkScannerHysteresis
 }

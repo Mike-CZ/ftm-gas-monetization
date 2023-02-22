@@ -24,7 +24,7 @@ func New(log *logger.AppLogger) *Manager {
 	}
 
 	// make services
-	mgr.blkScanner = newBlkScanner(&mgr)
+	mgr.blkScanner = newBlkScanner(&mgr, log)
 
 	return &mgr
 }

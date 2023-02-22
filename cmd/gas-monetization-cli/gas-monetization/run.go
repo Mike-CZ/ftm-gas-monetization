@@ -23,7 +23,7 @@ func run(ctx *cli.Context) error {
 	cfg := config.LoadFromCli(ctx)
 	app.Bootstrap(ctx, cfg)
 
-	res, err := app.Repository().GetHeader(1)
+	res, err := app.Repository().LastBlock()
 	if err != nil {
 		fmt.Println(err)
 		return nil

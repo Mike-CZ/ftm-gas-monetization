@@ -42,7 +42,7 @@ func Initialize() {
 // Repository provides access to the repository.
 func Repository() *repository.Repository {
 	onceRepository.Do(func() {
-		instance.repository = repository.New(instance.cfg, instance.log)
+		instance.repository = repository.New(&instance.ctx.Context, instance.cfg, instance.log)
 	})
 	return instance.repository
 }
