@@ -30,9 +30,22 @@ func (db *Db) LastBlock() (uint64, error) {
 	return lastBlock, nil
 }
 
+// UpdateLastBlock updates the last processed block.
+//
+//goland:noinspection SqlDialectInspection,SqlNoDataSourceInspection
+func (db *Db) UpdateLastBlock(block uint64) error {
+	_, err := db.con.Exec("INSERT INTO state (last_block) VALUES ($1) ON CONFLICT (last_block) DO UPDATE SET last_block = $1", block)
+	if err != nil {
+		db.log.Errorf("failed to update last block: %s", err)
+		return err
+	}
+	db.log.Noticef("last block updated to %d", block)
+	return nil
+}
+
 // migrateStateTables migrates the state tables.
 func (db *Db) migrateStateTables() {
-	_, err := db.con.ExecContext(db.ctx, stateSchema)
+	_, err := db.con.Exec(stateSchema)
 	if err != nil {
 		db.log.Panicf("failed to migrate state tables: %v", err)
 	}

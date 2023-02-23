@@ -1,7 +1,6 @@
 package db
 
 import (
-	"context"
 	"fmt"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
@@ -12,13 +11,12 @@ import (
 
 // Db defines the database repository.
 type Db struct {
-	ctx *context.Context
 	con *sqlx.DB
 	log *logger.AppLogger
 }
 
 // New creates a new database repository.
-func New(ctx *context.Context, cfg *config.Config, log *logger.AppLogger) *Db {
+func New(cfg *config.Config, log *logger.AppLogger) *Db {
 	dbLogger := log.ModuleLogger("db")
 
 	// Build connection string.
@@ -33,7 +31,6 @@ func New(ctx *context.Context, cfg *config.Config, log *logger.AppLogger) *Db {
 	}
 
 	db := Db{
-		ctx: ctx,
 		con: con,
 		log: dbLogger,
 	}

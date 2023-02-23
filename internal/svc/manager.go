@@ -2,6 +2,7 @@ package svc
 
 import (
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
+	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository"
 	"sync"
 )
 
@@ -12,21 +13,35 @@ type Manager struct {
 	log *logger.AppLogger
 
 	// managed services
-	blkScanner *blkScanner
+	blkScanner  *blkScanner
+	blkObserver *blkObserver
 }
 
-func New(log *logger.AppLogger) *Manager {
+func New(repo *repository.Repository, log *logger.AppLogger) *Manager {
 	// prep the manager
 	mgr := Manager{
 		wg:  new(sync.WaitGroup),
 		svc: make([]service, 0),
-		log: log,
+		log: log.ModuleLogger("svc_manager"),
 	}
 
 	// make services
-	mgr.blkScanner = newBlkScanner(&mgr, log)
+	mgr.blkScanner = newBlkScanner(&mgr, repo, log)
+	mgr.blkObserver = newBlkObserver(&mgr, repo, log)
+
+	// init and run
+	mgr.init()
+	log.Notice("all services are running")
+
+	// TODO: remove this
+	mgr.wg.Wait()
 
 	return &mgr
+}
+
+// init initializes the services in the correct order.
+func (mgr *Manager) init() {
+	mgr.blkScanner.init()
 }
 
 // add managed service instance to the Manager and run it.
