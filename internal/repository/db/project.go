@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS project_contract (
 
 // migrateProjectTables migrates the project tables.
 func (db *Db) migrateProjectTables() {
-	_, err := db.con.Exec(projectSchema)
+	_, err := db.db.Exec(projectSchema)
 	if err != nil {
 		db.log.Panicf("failed to migrate project tables: %v", err)
 	}

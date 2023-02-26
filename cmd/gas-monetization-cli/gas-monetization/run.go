@@ -22,12 +22,12 @@ func run(ctx *cli.Context) error {
 	cfg := config.LoadFromCli(ctx)
 	app.Bootstrap(ctx, cfg)
 	app.Start()
-	//res, err := app.Repository().LastBlock()
+	//res, err := app.Repository().BlockByNumber(nil)
 	//if err != nil {
 	//	fmt.Println(err)
 	//	return nil
 	//}
-	//fmt.Println(res)
+	//fmt.Println(res.Number.String())
 
 	return nil
 }

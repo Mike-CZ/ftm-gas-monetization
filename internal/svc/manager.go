@@ -8,57 +8,45 @@ import (
 
 // Manager represents the manager controlling services lifetime.
 type Manager struct {
-	wg  *sync.WaitGroup
-	svc []service
-	log *logger.AppLogger
+	repo *repository.Repository
+	wg   *sync.WaitGroup
+	svc  []serviceHandler
+	log  *logger.AppLogger
 
 	// managed services
-	blkScanner  *blkScanner
-	blkObserver *blkObserver
+	blkScanner    *blkScanner
+	blkDispatcher *blkDispatcher
 }
 
 func New(repo *repository.Repository, log *logger.AppLogger) *Manager {
 	// prep the manager
 	mgr := Manager{
-		wg:  new(sync.WaitGroup),
-		svc: make([]service, 0),
-		log: log.ModuleLogger("svc_manager"),
+		repo: repo,
+		wg:   new(sync.WaitGroup),
+		svc:  make([]serviceHandler, 0),
+		log:  log.ModuleLogger("svc_manager"),
 	}
-
-	// make services
-	mgr.blkScanner = newBlkScanner(&mgr, repo, log)
-	mgr.blkObserver = newBlkObserver(&mgr, repo, log)
-
-	// init and run
 	mgr.init()
-	log.Notice("all services are running")
-
-	// TODO: remove this
-	mgr.wg.Wait()
-
 	return &mgr
 }
 
-// init initializes the services in the correct order.
-func (mgr *Manager) init() {
-	mgr.blkScanner.init()
-}
+// Run starts all the services prepared to be run.
+func (mgr *Manager) Run() {
+	// init all the services to the starting state
+	for _, s := range mgr.svc {
+		s.init()
+	}
 
-// add managed service instance to the Manager and run it.
-func (mgr *Manager) add(s service) {
-	// keep track of running services
-	mgr.svc = append(mgr.svc, s)
+	// connect services' input channels to their source
+	mgr.blkDispatcher.inBlock = mgr.blkScanner.outBlock
+	mgr.blkScanner.inDispatched = mgr.blkDispatcher.outDispatched
 
-	// run the service
-	mgr.wg.Add(1)
-	go s.run()
-	mgr.log.Noticef("service %s started", s.name())
-}
+	// start services
+	for _, s := range mgr.svc {
+		s.run()
+	}
 
-// closed signals the manager a service terminated.
-func (mgr *Manager) closed(s service) {
-	mgr.wg.Done()
-	mgr.log.Noticef("service %s stopped", s.name())
+	mgr.wg.Wait()
 }
 
 // Close terminates the service manager
@@ -73,4 +61,40 @@ func (mgr *Manager) Close() {
 
 	mgr.wg.Wait()
 	mgr.log.Notice("services closed")
+}
+
+// init initializes the services in the correct order.
+func (mgr *Manager) init() {
+	// make services
+	mgr.blkScanner = &blkScanner{
+		service: service{
+			repo: mgr.repo,
+			log:  mgr.log.ModuleLogger("blk_scanner"),
+			mgr:  mgr,
+		},
+	}
+	mgr.svc = append(mgr.svc, mgr.blkScanner)
+
+	mgr.blkDispatcher = &blkDispatcher{
+		service: service{
+			repo: mgr.repo,
+			log:  mgr.log.ModuleLogger("blk_scanner"),
+			mgr:  mgr,
+		},
+	}
+	mgr.svc = append(mgr.svc, mgr.blkDispatcher)
+}
+
+// started signals to the manager that the calling service
+// has been started and is functioning.
+func (mgr *Manager) started(svc serviceHandler) {
+	mgr.wg.Add(1)
+	mgr.log.Noticef("%s is running", svc.name())
+}
+
+// finished signals to the manager that the calling service
+// has been terminated and is no longer running.
+func (mgr *Manager) finished(svc serviceHandler) {
+	mgr.wg.Done()
+	mgr.log.Noticef("%s terminated", svc.name())
 }

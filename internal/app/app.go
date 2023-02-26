@@ -37,6 +37,7 @@ func Start() {
 	// start the manager
 	if instance.manager == nil {
 		instance.manager = svc.New(Repository(), instance.log)
+		instance.manager.Run()
 	}
 }
 

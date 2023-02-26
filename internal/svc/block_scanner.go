@@ -1,269 +1,214 @@
 package svc
 
 import (
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository"
-	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"time"
 )
 
-const (
-	// blkIsScanning represents the state of active block scanning
-	blkIsScanning = iota
+// blsObserverTickBaseDuration represents the frequency of the scanner status observer.
+const blsObserverTickBaseDuration = 5 * time.Second
 
-	// blkIsIdling represents the state of passive head checks
-	blkIsIdling
+// blsScanTickBaseDuration represents the frequency of the scanner default progress.
+const blsScanTickBaseDuration = 5 * time.Millisecond
 
-	// blockQueueCapacity represents the capacity of block headers processor queue
-	blockQueueCapacity = 5000
+// blsObserverTickIdleDuration represents the frequency of the scanner status observer on idle.
+const blsObserverTickIdleDuration = 1 * time.Minute
 
-	// scanTickFrequency is the time delay for the regular scanner
-	scanTickFrequency = 4 * time.Millisecond
+// blsScanTickIdleDuration represents the frequency of the scanner re-check on idle.
+const blsScanTickIdleDuration = 5 * time.Minute
 
-	// idleTickFrequency is the time delay for the regular scanner
-	idleTickFrequency = 1 * time.Second
+// blsBlockBufferCapacity represents the capacity of the found blocks channel.
+// When the channel is full, the push will have to wait for room here and the scanner
+// will be slowed down naturally.
+const blsBlockBufferCapacity = 1000
 
-	// topUpdateTickFrequency is the time delay for the block head update
-	topUpdateTickFrequency = 5 * time.Second
-
-	// blkScannerHysteresis represent the number of blocks we let slide
-	// until we switch back to active scan state.
-	blkScannerHysteresis = 10
-)
+// blsReScanHysteresis is the number of blocks we wait from dispatcher until a re-scan kicks in.
+const blsReScanHysteresis = 100
 
 // blkScanner represents a scanner of historical data from the blockchain.
 type blkScanner struct {
-	repo *repository.Repository
-	log  *logger.AppLogger
-
-	// mgr represents the Manager instance
-	mgr *Manager
-
-	// sigStop represents the signal for closing the router
-	sigStop chan bool
-
-	// inObservedBlocks is a channel receiving IDs of observed blocks
-	// we track the observed heads to recognize if we need to switch back to scan from idle
-	inObservedBlocks chan uint64
-
-	// inRescanBlocks is a channel receiving re-scan requests from given block number
-	inRescanBlocks chan uint64
-
-	// outBlocks represents a channel fed with past block headers being scanned.
-	outBlocks chan *types.Header
-
-	// scanTicker represents the ticker for the scanner
-	scanTicker *time.Ticker
-
-	// state represents the current state of the scanner
-	// it's scanning by default and turns idle later, if not needed
-	state int
-
-	// current represents the ID of the currently processed block
-	current uint64
-
-	// target represents the ID we need to reach
-	target uint64
-
-	// lastProcessedBlock represents the ID of the last processed block notified to us
-	lastProcessedBlock uint64
-}
-
-// newBlkScanner creates a new instance of the block scanner service.
-func newBlkScanner(mgr *Manager, repo *repository.Repository, log *logger.AppLogger) *blkScanner {
-	return &blkScanner{
-		repo:      repo,
-		log:       log.ModuleLogger("block_scanner"),
-		mgr:       mgr,
-		sigStop:   make(chan bool, 1),
-		outBlocks: make(chan *types.Header, blockQueueCapacity),
-	}
+	service
+	outBlock       chan *types.Block
+	outStateSwitch chan bool
+	inDispatched   chan uint64
+	observeTick    *time.Ticker
+	scanTick       *time.Ticker
+	onIdle         bool
+	from           uint64
+	next           uint64
+	to             uint64
+	done           uint64
 }
 
 // init initializes the block scanner and registers it with the manager.
-func (bs *blkScanner) init() {
-	//bs.inObservedBlocks = bs.mgr.logObserver.outObservedBlocks
-	//bs.inRescanBlocks = bs.mgr.collectionValidator.outRescanQueue
-
-	bs.current = bs.startBlock()
-	bs.target = bs.targetBlock()
-
-	bs.mgr.add(bs)
-}
-
-// name provides the name of the service.
-func (bs *blkScanner) name() string {
-	return "block scanner"
-}
-
-// close signals the block observer to terminate
-func (bs *blkScanner) close() {
-	bs.sigStop <- true
+func (bls *blkScanner) init() {
+	bls.onIdle = false
+	bls.sigStop = make(chan struct{})
+	bls.outStateSwitch = make(chan bool, 1)
+	bls.outBlock = make(chan *types.Block, blsBlockBufferCapacity)
 }
 
 // run scans past blocks one by one until it reaches top
 // after the top is reached, it idles and checks the head state to make sure
 // the API server keeps up with the most recent block
-func (bs *blkScanner) run() {
-	// make tickers
-	topTick := time.NewTicker(topUpdateTickFrequency)
-	bs.scanTicker = time.NewTicker(scanTickFrequency)
+func (bls *blkScanner) run() {
+	// get the scanner start block
+	start, err := bls.startBlock()
+	if err != nil {
+		bls.log.Errorf("scanner can not proceed; %s", err.Error())
+		return
+	}
 
-	// make sure to stop the tickers and notify the manager
+	// signal orchestrator we started and go
+	bls.log.Noticef("block scan starts at #%d", start)
+	bls.from = start
+	bls.next = start
+
+	bls.mgr.started(bls)
+	go bls.execute()
+}
+
+// name provides the name of the service.
+func (bls *blkScanner) name() string {
+	return "block scanner"
+}
+
+// close signals the block scanner to terminate
+func (bls *blkScanner) close() {
+	if bls.scanTick != nil {
+		bls.scanTick.Stop()
+		bls.observeTick.Stop()
+	}
+	if bls.sigStop != nil {
+		close(bls.sigStop)
+	}
+}
+
+// execute scans blockchain blocks in the given range and push found blocks
+// to the output channel for processing.
+func (bls *blkScanner) execute() {
 	defer func() {
-		topTick.Stop()
-		bs.scanTicker.Stop()
-		bs.mgr.closed(bs)
+		close(bls.outBlock)
+		close(bls.outStateSwitch)
+		bls.mgr.finished(bls)
 	}()
 
+	// set initial state and start the tickers for observer and scanner
+	bls.observe()
+	bls.observeTick = time.NewTicker(blsObserverTickBaseDuration)
+	bls.scanTick = time.NewTicker(blsScanTickBaseDuration)
+
+	// do the scan
 	for {
-		// make sure to check for terminate; but do not stay in
 		select {
-		case <-bs.sigStop:
+		case <-bls.sigStop:
 			return
-
-		case <-topTick.C:
-			bs.target = bs.targetBlock()
-			bs.updateLastBlock()
-
-		case bid, ok := <-bs.inObservedBlocks:
-			if !ok {
-				return
+		case bin, ok := <-bls.inDispatched:
+			// ignore block re-scans; do not skip blocks in dispatched # counter
+			if ok && (bls.done == 0 || int64(bin)-int64(bls.done) == 1) {
+				bls.done = bin
 			}
-
-			bs.log.Noticef("observed block #%d", bid)
-
-			// we just casually follow the chain head
-			if bs.state == blkIsIdling && bid > bs.current {
-				bs.current = bid
-				bs.lastProcessedBlock = bid
-				continue
-			}
-
-			// we rush to catch the head, so we don't accept processed blocks above scanner head
-			if bid > bs.lastProcessedBlock && bid <= bs.current {
-				bs.lastProcessedBlock = bid
-			}
-
-		case bid, ok := <-bs.inRescanBlocks:
-			if !ok {
-				return
-			}
-			bs.rescan(bid)
-
-		case <-bs.scanTicker.C:
+		case <-bls.observeTick.C:
+			bls.updateState(bls.observe())
+		case <-bls.scanTick.C:
+			bls.shift()
 		}
-
-		bs.next()
-		bs.checkTarget()
-		bs.checkIdle()
 	}
+}
+
+// observe updates the scanner final block and logs the progress.
+// It returns expected idle state to be used to transition if needed.
+func (bls *blkScanner) observe() bool {
+	// try to get the block height
+	bh, err := bls.repo.BlockHeight()
+	if err != nil {
+		bls.log.Errorf("can not get current block height; %s", err.Error())
+		return false
+	}
+
+	// if on idle, wait for the dispatcher to catch up with the blocks
+	// we use a hysteresis to delay state flip back to active scan
+	// we compare current block height with the latest known dispatched block number
+	target := bh.ToInt().Uint64()
+	if bls.onIdle && target < bls.done+blsReScanHysteresis {
+		bls.next = bls.done
+		bls.from = bls.done
+		bls.log.Infof("block scanner idling at #%d, head at #%d", bls.next, target)
+		return true
+	}
+
+	// adjust target block number; log the progress of the scan
+	bls.to = target
+	bls.log.Infof("block scanner at #%d of <#%d, #%d>, #%d dispatched", bls.next, bls.from, bls.to, bls.done)
+	return bls.to < bls.next
+}
+
+// updateState change scanner state if needed.
+// It resets the internal tickers according to the target state.
+func (bls *blkScanner) updateState(target bool) {
+	// if the state already match, do nothing
+	if target == bls.onIdle {
+		return
+	}
+
+	// switch the state; advertise the transition
+	bls.log.Noticef("block scanner idle state toggled to %t", target)
+	bls.onIdle = target
+
+	select {
+	case bls.outStateSwitch <- target:
+	case <-bls.sigStop:
+		return
+	}
+
+	// going full speed
+	if !target {
+		bls.observeTick.Reset(blsObserverTickBaseDuration)
+		bls.scanTick.Reset(blsScanTickBaseDuration)
+		return
+	}
+
+	// going idle
+	bls.observeTick.Reset(blsObserverTickIdleDuration)
+	bls.scanTick.Reset(blsScanTickIdleDuration)
 }
 
 // startBlock provides the starting block for the scanner
-func (bs *blkScanner) startBlock() uint64 {
-	lb, err := bs.repo.LastBlock()
+func (bls *blkScanner) startBlock() (uint64, error) {
+	lb, err := bls.repo.LastProcessedBlock()
 	if err != nil {
-		bs.log.Criticalf("can not pull last seen block; %s", err.Error())
-		return 0
+		bls.log.Criticalf("can not pull last seen block; %s", err.Error())
+		return 0, err
 	}
-
-	if lb <= blkScannerHysteresis {
-		return lb
-	}
-
-	return lb - blkScannerHysteresis
+	return lb, nil
 }
 
-// targetBlock provides the number of the target block for the scanner.
-func (bs *blkScanner) targetBlock() uint64 {
-	cur, err := bs.repo.CurrentHead()
+// shift pulls the next block if available and pushes it for processing.
+func (bls *blkScanner) shift() {
+	// we may not need to pull at all, if on updateState
+	if bls.onIdle {
+		return
+	}
+
+	// are we at the end? check the status
+	if bls.next > bls.to {
+		bls.updateState(bls.observe())
+		return
+	}
+
+	// pull the current block
+	block, err := bls.repo.BlockByNumber((*hexutil.Uint64)(&bls.next))
 	if err != nil {
-		bs.log.Criticalf("can not pull the latest head number; %s", err.Error())
-		return 0
-	}
-
-	bs.log.Noticef("target block is #%d", cur)
-
-	return cur
-}
-
-// updateLastBlock updates last seen block in repository, if any.
-func (bs *blkScanner) updateLastBlock() {
-	if bs.lastProcessedBlock == 0 {
-		return
-	}
-	_ = bs.repo.UpdateLastBlock(bs.lastProcessedBlock)
-
-	if bs.state == blkIsIdling {
-		bs.log.Noticef("idle at #%d, head at #%d", bs.current, bs.target)
-		return
-	}
-	bs.log.Noticef("scanner at #%d of #%d; processed #%d", bs.current, bs.target, bs.lastProcessedBlock)
-}
-
-// next tries to advance the scanner to the next block, if possible
-func (bs *blkScanner) next() {
-	if bs.state == blkIsScanning && bs.current <= bs.target {
-		hdr, err := bs.repo.GetHeader(bs.current)
-		if err != nil {
-			bs.log.Errorf("block header #%s not available; %s", bs.current, err.Error())
-			return
-		}
-		// send the block to the observer; make sure not to miss stop signal
-		select {
-		case bs.outBlocks <- hdr:
-			bs.current += 1
-		case <-bs.sigStop:
-			bs.sigStop <- true
-		}
-	}
-}
-
-// rescan the blockchain from the given block, if relevant.
-func (bs *blkScanner) rescan(from uint64) {
-	// are we already on the track?
-	if from > bs.current {
+		bls.log.Errorf("block #%d not available; %s", bls.next, err.Error())
 		return
 	}
 
-	// refresh target block
-	bs.target = bs.targetBlock()
-
-	// we know from <= current here; start at least <blkScannerHysteresis> back
-	diff := bs.current - from
-	if diff < blkScannerHysteresis {
-		bs.current = bs.current - blkScannerHysteresis
-		return
-	}
-	bs.current = from
-}
-
-// checkTarget checks if the scanner reached designated target head.
-func (bs *blkScanner) checkTarget() {
-	// reached target? make sure we are on target; switch state if so
-	if bs.state == blkIsScanning && bs.current > bs.target {
-		bs.target = bs.targetBlock()
-		diff := int64(bs.target) - int64(bs.current)
-
-		if diff <= 0 {
-			bs.state = blkIsIdling
-			bs.scanTicker.Reset(idleTickFrequency)
-			bs.log.Noticef("scanner idling since #%d", bs.current)
-		}
-	}
-}
-
-// checkIdle checks if the idle state should be switched back to active scan.
-func (bs *blkScanner) checkIdle() {
-	if bs.state != blkIsIdling {
-		return
-	}
-
-	diff := int64(bs.target) - int64(bs.current)
-	if diff >= blkScannerHysteresis {
-		bs.state = blkIsScanning
-		bs.scanTicker.Reset(scanTickFrequency)
-		bs.log.Noticef("scanner head at #%d of #%d with %d diff", bs.current, bs.target, diff)
+	// push the block for processing and advance to the next expected block
+	// observe possible stop signal during a wait for the block queue slot
+	select {
+	case bls.outBlock <- block:
+		bls.next++
+	case <-bls.sigStop:
 	}
 }
