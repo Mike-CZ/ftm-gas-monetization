@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -84,7 +85,7 @@ func (db *Db) LastProcessedEpoch(ctx context.Context) (uint64, error) {
 // UpdateLastProcessedEpoch updates the last processed epoch.
 //
 //goland:noinspection SqlDialectInspection,SqlNoDataSourceInspection
-func (db *Db) UpdateLastProcessedEpoch(ctx context.Context, epoch uint64) error {
+func (db *Db) UpdateLastProcessedEpoch(ctx context.Context, epoch hexutil.Uint64) error {
 	_, err := db.con.ExecContext(ctx,
 		"INSERT INTO state (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2",
 		stateKeyLastProcessedEpoch, epoch)
