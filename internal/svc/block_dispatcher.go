@@ -60,7 +60,7 @@ func (bld *blkDispatcher) execute() {
 				return
 			}
 
-			// process the new block
+			// storeContract the new block
 			bld.log.Debugf("block #%d arrived", uint64(blk.Number))
 			if !bld.process(blk) {
 				continue
@@ -97,7 +97,7 @@ func (bld *blkDispatcher) process(blk *types.Block) bool {
 
 // processTxs loops all the transactions in the block and process them.
 func (bld *blkDispatcher) processTxs(blk *types.Block) bool {
-	// process all transactions in database transaction to ensure
+	// storeContract all transactions in database transaction to ensure
 	// all transactions are processed or none
 	err := bld.repo.DatabaseTransaction(func(ctx context.Context, db *db.Db) error {
 		for _, th := range blk.Txs {
@@ -110,6 +110,7 @@ func (bld *blkDispatcher) processTxs(blk *types.Block) bool {
 			}
 		}
 
+		// todo do we want to update it here?
 		// update epoch number
 		if uint64(blk.Epoch) > bld.lastProcessedEpoch {
 			if err := db.UpdateLastProcessedEpoch(ctx, blk.Epoch); err != nil {
@@ -126,7 +127,7 @@ func (bld *blkDispatcher) processTxs(blk *types.Block) bool {
 	})
 
 	if err != nil {
-		bld.log.Errorf("failed to process transactions; %s", err.Error())
+		bld.log.Errorf("failed to storeContract transactions; %s", err.Error())
 		return false
 	}
 
