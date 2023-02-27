@@ -75,7 +75,13 @@ func (mgr *Manager) init() {
 	}
 	mgr.svc = append(mgr.svc, mgr.blkScanner)
 
+	lastEpoch, err := mgr.repo.LastProcessedEpoch()
+	if err != nil {
+		mgr.log.Fatalf("can not get last processed epoch. Err: %v", err)
+	}
+
 	mgr.blkDispatcher = &blkDispatcher{
+		lastProcessedEpoch: lastEpoch,
 		service: service{
 			repo: mgr.repo,
 			log:  mgr.log.ModuleLogger("blk_scanner"),

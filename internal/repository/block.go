@@ -18,6 +18,12 @@ func (repo *Repository) BlockHeight() (*hexutil.Big, error) {
 	return repo.rpc.BlockHeight()
 }
 
+func (repo Repository) LastProcessedEpoch() (uint64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dbQueryTimeoutDuration)
+	defer cancel()
+	return repo.db.LastProcessedEpoch(ctx)
+}
+
 // LastProcessedBlock returns the last processed block number.
 func (repo *Repository) LastProcessedBlock() (uint64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), dbQueryTimeoutDuration)

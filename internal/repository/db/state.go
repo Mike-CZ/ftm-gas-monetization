@@ -64,10 +64,10 @@ func (db *Db) UpdateLastProcessedBlock(ctx context.Context, block uint64) error 
 // LastProcessedEpoch returns the last processed epoch.
 //
 //goland:noinspection SqlDialectInspection,SqlNoDataSourceInspection
-func (db *Db) LastProcessedEpoch(ctx context.Context) (hexutil.Uint64, error) {
+func (db *Db) LastProcessedEpoch(ctx context.Context) (uint64, error) {
 	db.log.Debugf("getting last epoch from the database")
 
-	var lastEpoch hexutil.Uint64
+	var lastEpoch uint64
 	err := sqlx.GetContext(ctx, db.con, &lastEpoch, "SELECT value FROM state WHERE key = $1", stateKeyLastProcessedEpoch)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

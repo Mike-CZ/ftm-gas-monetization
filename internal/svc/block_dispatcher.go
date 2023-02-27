@@ -6,16 +6,15 @@ import (
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/db"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"time"
 )
 
 // blkDispatcher implements a service responsible for processing new blocks on the blockchain.
 type blkDispatcher struct {
 	service
-	inBlock       chan *types.Block
-	outDispatched chan uint64
-	currentEpoch  hexutil.Uint64
+	inBlock            chan *types.Block
+	outDispatched      chan uint64
+	lastProcessedEpoch uint64
 }
 
 // name returns the name of the service used by orchestrator.
@@ -112,11 +111,11 @@ func (bld *blkDispatcher) processTxs(blk *types.Block) bool {
 		}
 
 		// update epoch number
-		if blk.Epoch > bld.currentEpoch {
+		if uint64(blk.Epoch) > bld.lastProcessedEpoch {
 			if err := db.UpdateLastProcessedEpoch(ctx, blk.Epoch); err != nil {
 				return err
 			}
-			bld.currentEpoch = blk.Epoch
+			bld.lastProcessedEpoch = uint64(blk.Epoch)
 		}
 
 		// update last processed block number, so we can continue from here
