@@ -97,7 +97,6 @@ func (bld *blkDispatcher) process(blk *types.Block) bool {
 
 // processTxs loops all the transactions in the block and process them.
 func (bld *blkDispatcher) processTxs(blk *types.Block) bool {
-	var currentEpoch hexutil.Uint64
 	// process all transactions in database transaction to ensure
 	// all transactions are processed or none
 	err := bld.repo.DatabaseTransaction(func(ctx context.Context, db *db.Db) error {
@@ -111,16 +110,22 @@ func (bld *blkDispatcher) processTxs(blk *types.Block) bool {
 			}
 		}
 
+		var currentEpoch hexutil.Uint64
+		var err error
+
+		if currentEpoch, err = db.LastProcessedEpoch(ctx); err != nil {
+			return err
+		}
+
 		// update epoch number
 		if blk.Epoch > currentEpoch {
-			if err := db.UpdateLastProcessedEpoch(ctx, blk.Epoch); err != nil {
+			if err = db.UpdateLastProcessedEpoch(ctx, blk.Epoch); err != nil {
 				return err
 			}
-			currentEpoch = blk.Epoch
 		}
 
 		// update last processed block number, so we can continue from here
-		if err := db.UpdateLastProcessedBlock(ctx, uint64(blk.Number)); err != nil {
+		if err = db.UpdateLastProcessedBlock(ctx, uint64(blk.Number)); err != nil {
 			return err
 		}
 		return nil
