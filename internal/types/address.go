@@ -54,7 +54,7 @@ func (a *Address) Scan(value interface{}) error {
 // package to convert Address into a value that can be stored in a database. The converted value is a string
 // without the 0x prefix.
 func (a *Address) Value() (driver.Value, error) {
-	if a.Address == (common.Address{}) {
+	if a == nil || a.Address == (common.Address{}) {
 		return nil, nil
 	}
 	return a.Address.Hex()[2:], nil

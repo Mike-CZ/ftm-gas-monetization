@@ -2,7 +2,6 @@
 package types
 
 import (
-	"encoding/json"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
@@ -35,16 +34,4 @@ type Block struct {
 
 	// Txs represents array of 32 bytes hashes of transactions included in the block.
 	Txs []*common.Hash `json:"transactions"`
-}
-
-// UnmarshalBlock parses the JSON-encoded block data.
-func UnmarshalBlock(data []byte) (*Block, error) {
-	var blk Block
-	err := json.Unmarshal(data, &blk)
-	return &blk, err
-}
-
-// Marshal returns the JSON encoding of block.
-func (b *Block) Marshal() ([]byte, error) {
-	return json.Marshal(b)
 }

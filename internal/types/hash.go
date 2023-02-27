@@ -54,7 +54,7 @@ func (h *Hash) Scan(value interface{}) error {
 // package to convert Hash into a value that can be stored in a database. The converted value is a string
 // without the 0x prefix.
 func (h *Hash) Value() (driver.Value, error) {
-	if h.Hash == (common.Hash{}) {
+	if h == nil || h.Hash == (common.Hash{}) {
 		return nil, nil
 	}
 	return h.Hash.Hex()[2:], nil

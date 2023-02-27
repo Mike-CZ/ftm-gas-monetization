@@ -52,5 +52,8 @@ func (b *Big) Scan(value interface{}) error {
 // Value implements the driver.Valuer interface. This method is used by the database/sql
 // package to convert Big into a value that can be stored in a database.
 func (b *Big) Value() (driver.Value, error) {
+	if b == nil {
+		return nil, nil
+	}
 	return b.Big.String()[2:], nil
 }
