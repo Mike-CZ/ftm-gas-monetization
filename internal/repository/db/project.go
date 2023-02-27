@@ -4,12 +4,12 @@ package db
 var projectSchema = `
 CREATE TABLE IF NOT EXISTS project (
     id serial PRIMARY KEY,
-    receiver_address BYTEA(40) NOT NULL,
+    receiver_address VARCHAR(40) NOT NULL,
     name text
 );
 CREATE TABLE IF NOT EXISTS project_contract (
     project_id INT NOT NULL,
-    address BYTEA(40) NOT NULL,
+    address VARCHAR(40) NOT NULL,
     CONSTRAINT fk_project
       FOREIGN KEY(project_id) 
       REFERENCES project(id)
