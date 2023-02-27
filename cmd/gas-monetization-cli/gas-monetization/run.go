@@ -13,13 +13,12 @@ var CmdRun = cli.Command{
 	Name:   "run",
 	Usage:  `Runs the gas monetization app.`,
 	Flags: []cli.Flag{
-		&flags.OperaRpcUrl,
-		&flags.LogLevel,
+		&flags.Cfg,
 	},
 }
 
 func run(ctx *cli.Context) error {
-	cfg := config.LoadFromCli(ctx)
+	cfg := config.Load(ctx)
 	app.Bootstrap(ctx, cfg)
 	app.Start()
 	//res, err := app.Repository().BlockByNumber(nil)

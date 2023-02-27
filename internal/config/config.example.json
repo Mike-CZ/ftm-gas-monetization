@@ -1,0 +1,11 @@
+{
+  "db": {
+    "user": "root",
+    "password": "root",
+    "host": "localhost",
+    "port": 5432,
+    "name": "gas_monetization"
+  },
+  "loggingLevel": 4,
+  "operaRpcUrl": "https://rpcapi.fantom.network"
+}
