@@ -23,8 +23,8 @@ func New(cfg *config.Config, log *logger.AppLogger) *Db {
 	dbLogger := log.ModuleLogger("db")
 
 	// Build connection string.
-	cs := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		cfg.DbUser, cfg.DbPassword, cfg.DbHost, cfg.DbPort, cfg.DbName)
+	cs := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
+		cfg.DB.User, cfg.DB.Password, cfg.DB.Host, cfg.DB.Port, cfg.DB.Name)
 
 	// Connect to the database.
 	con, err := sqlx.Connect("postgres", cs)

@@ -3,10 +3,9 @@ package main
 
 import (
 	"github.com/Mike-CZ/ftm-gas-monetization/cmd/gas-monetization-cli/gas-monetization"
+	"github.com/urfave/cli/v2"
 	"log"
 	"os"
-
-	"github.com/urfave/cli/v2"
 )
 
 func initApp() *cli.App {

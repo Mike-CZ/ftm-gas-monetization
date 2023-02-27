@@ -11,7 +11,7 @@ var CmdConfig = cli.Command{
 	Name:  "config",
 	Usage: "Prints default config",
 	Action: func(ctx *cli.Context) error {
-		cfg := config.LoadFromCli(ctx)
+		cfg := config.Load(ctx)
 		enc := json.NewEncoder(ctx.App.Writer)
 		enc.SetIndent("", "    ")
 		if err := enc.Encode(cfg); err != nil {
