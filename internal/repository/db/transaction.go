@@ -1,72 +1,48 @@
 package db
 
+import (
+	"context"
+	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
+	"github.com/jmoiron/sqlx"
+)
+
+//goland:noinspection SqlDialectInspection,SqlNoDataSourceInspection
+var transactionSchema = `
+CREATE TABLE IF NOT EXISTS transaction (
+    hash VARCHAR(64) PRIMARY KEY,
+    block_hash VARCHAR(64),
+    block_number BIGINT,
+	timestamp TIMESTAMP NOT NULL,
+	from_address VARCHAR(40) NOT NULL,
+	to_address VARCHAR(40),
+	gas_limit BIGINT NOT NULL,
+    gas_used BIGINT,
+    gas_price TEXT NOT NULL
+);
+`
+
+// StoreTransaction stores a transaction reference in connected persistent storage.
 //
-//import (
-//	"context"
-//	"fmt"
-//	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
-//	"github.com/ethereum/go-ethereum/common/hexutil"
-//)
-//
-//// AddTransaction stores a transaction reference in connected persistent storage.
-//func (db *Db) AddTransaction(block *types.Block, trx *types.Transaction) error {
-//	// do we have all needed data?
-//	if block == nil || trx == nil {
-//		return fmt.Errorf("can not add empty transaction")
-//	}
-//
-//	// get the collection for transactions
-//	col := db.client.Database(db.dbName).Collection(colTransactions)
-//
-//	// if the transaction already exists, we don't need to add it
-//	// just make sure the transaction accounts were processed
-//	if !db.shouldAddTransaction(col, trx) {
-//		return db.UpdateTransaction(col, trx)
-//	}
-//
-//	trx.LargeInput = len(trx.InputData) > trxLargeInputWall
-//	if trx.LargeInput {
-//		trx.InputData = hexutil.Bytes{}
-//	}
-//
-//	if _, err := col.UpdateOne(
-//		context.Background(),
-//		bson.D{{Key: fiTransactionHash, Value: trx.Hash}},
-//		bson.D{
-//			{Key: "$set", Value: bson.D{
-//				{Key: fiTransactionBlockHash, Value: trx.BlockHash},
-//				{Key: fiTransactionBlockNumber, Value: trx.BlockNumber},
-//				{Key: fiTransactionTimeStamp, Value: trx.TimeStamp},
-//				{Key: fiTransactionFrom, Value: trx.From},
-//				{Key: fiTransactionGas, Value: trx.Gas},
-//				{Key: fiTransactionGasUsed, Value: trx.GasUsed},
-//				{Key: fiTransactionCumulativeGasUsed, Value: trx.CumulativeGasUsed},
-//				{Key: fiTransactionGasPrice, Value: trx.GasPrice},
-//				{Key: fiTransactionNonce, Value: trx.Nonce},
-//				{Key: fiTransactionTo, Value: trx.To},
-//				{Key: fiTransactionContractAddress, Value: trx.ContractAddress},
-//				{Key: fiTransactionValue, Value: trx.Value},
-//				{Key: fiTransactionInputData, Value: trx.InputData},
-//				{Key: fiTransactionLargeInput, Value: trx.LargeInput},
-//				{Key: fiTransactionIndex, Value: trx.Index},
-//				{Key: fiTransactionStatus, Value: trx.Status},
-//				{Key: fiTransactionLogs, Value: trx.Logs},
-//				{Key: fiTransactionOrdinalIndex, Value: trx.ComputedOrdinalIndex()},
-//				{Key: fiTransactionAmount, Value: trx.ComputedAmount()},
-//				{Key: fiTransactionGasGWei, Value: trx.ComputedGWei()},
-//			}},
-//			{Key: "$setOnInsert", Value: bson.D{
-//				{Key: fiTransactionHash, Value: trx.Hash},
-//			}},
-//		},
-//		options.Update().SetUpsert(true),
-//	); err != nil {
-//		db.log.Critical(err)
-//		return err
-//	}
-//
-//	// add transaction to the db
-//	db.log.Debugf("transaction %s added to database", trx.Hash.String())
-//
-//	return nil
-//}
+//goland:noinspection SqlDialectInspection,SqlNoDataSourceInspection
+func (db *Db) StoreTransaction(ctx context.Context, trx *types.Transaction) error {
+	query := `INSERT INTO transaction (hash, block_hash, block_number, timestamp, from_address, to_address, gas_limit, gas_used, gas_price) 
+		VALUES (:hash, :block_hash, :block_number, :timestamp, :from_address, :to_address, :gas_limit, :gas_used, :gas_price)`
+
+	_, err := sqlx.NamedExecContext(ctx, db.con, query, trx)
+	if err != nil {
+		db.log.Errorf("failed to store transaction %s: %v", trx.Hash.String(), err)
+		return err
+	}
+
+	// add transaction to the db
+	db.log.Debugf("transaction %s added to database", trx.Hash.String())
+	return nil
+}
+
+// migrateTransactionTables migrates the transaction tables.
+func (db *Db) migrateTransactionTables() {
+	_, err := db.db.Exec(transactionSchema)
+	if err != nil {
+		db.log.Panicf("failed to migrate state tables: %v", err)
+	}
+}

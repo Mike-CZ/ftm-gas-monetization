@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
-
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
@@ -85,5 +84,6 @@ func (db *Db) migrateTables() {
 	db.log.Notice("running database migrations")
 	db.migrateStateTables()
 	db.migrateProjectTables()
+	db.migrateTransactionTables()
 	db.log.Notice("database migrations completed")
 }

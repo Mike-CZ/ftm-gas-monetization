@@ -15,7 +15,7 @@ const (
 	stateKeyLastProcessedEpoch = "last_epoch"
 )
 
-//goland:noinspection GoUnusedGlobalVariable,SqlDialectInspection,SqlNoDataSourceInspection
+//goland:noinspection SqlDialectInspection,SqlNoDataSourceInspection
 var stateSchema = `
 CREATE TABLE IF NOT EXISTS state (
     key VARCHAR PRIMARY KEY,

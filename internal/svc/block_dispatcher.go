@@ -3,7 +3,6 @@ package svc
 
 import (
 	"context"
-	"database/sql"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/db"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
 	"github.com/ethereum/go-ethereum/common"
@@ -97,28 +96,27 @@ func (bld *blkDispatcher) process(blk *types.Block) bool {
 
 // processTxs loops all the transactions in the block and process them.
 func (bld *blkDispatcher) processTxs(blk *types.Block) bool {
-	for i, th := range blk.Txs {
-		bld.log.Debugf("loading trx #%d from block #%d", i, blk.Number)
-		trx := bld.load(blk, th)
-
-		//TODO: What to do when transaction fails to load?
-		if trx != nil {
-			//bld.log.Noticef("transaction %s loaded", trx.Hash.String())
-		}
-	}
-
-	sql.NullString{}
-
+	// process all transactions in database transaction to ensure
+	// all transactions are processed or none
 	err := bld.repo.DatabaseTransaction(func(ctx context.Context, db *db.Db) error {
-		err := db.UpdateLastProcessedBlock(ctx, uint64(blk.Number))
-		if err != nil {
-			bld.log.Errorf("failed to update last processed block number; %s", err.Error())
+		for _, th := range blk.Txs {
+			trx := bld.load(blk, th)
+			//TODO: What to do when transaction fails to load?
+			if trx != nil {
+				if err := db.StoreTransaction(ctx, trx); err != nil {
+					return err
+				}
+			}
+		}
+		// update last processed block number, so we can continue from here
+		if err := db.UpdateLastProcessedBlock(ctx, uint64(blk.Number)); err != nil {
 			return err
 		}
 		return nil
 	})
+
 	if err != nil {
-		bld.log.Errorf("failed to update last processed block number; %s", err.Error())
+		bld.log.Errorf("failed to process transactions; %s", err.Error())
 		return false
 	}
 
