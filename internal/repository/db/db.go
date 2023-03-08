@@ -5,8 +5,13 @@ import (
 	"fmt"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"path/filepath"
+	"runtime"
 )
 
 // Db defines the database repository.
@@ -19,12 +24,12 @@ type Db struct {
 }
 
 // New creates a new database repository.
-func New(cfg *config.Config, log *logger.AppLogger) *Db {
+func New(config *config.DB, log *logger.AppLogger) *Db {
 	dbLogger := log.ModuleLogger("db")
 
 	// Build connection string.
-	cs := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
-		cfg.DB.User, cfg.DB.Password, cfg.DB.Host, cfg.DB.Port, cfg.DB.Name)
+	cs := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+		config.User, config.Password, config.Host, config.Port, config.Name)
 
 	// Connect to the database.
 	con, err := sqlx.Connect("postgres", cs)
@@ -41,7 +46,11 @@ func New(cfg *config.Config, log *logger.AppLogger) *Db {
 	}
 
 	// Run the database migrations.
-	db.migrateTables()
+	if err := db.migrateTables(cs); err != nil {
+		dbLogger.Criticalf("failed to run the database migrations: %s", err)
+		_ = con.Close()
+		return nil
+	}
 
 	return &db
 }
@@ -80,10 +89,21 @@ func (db *Db) DatabaseTransaction(ctx context.Context, fn func(context.Context, 
 }
 
 // migrateTables runs the database migrations.
-func (db *Db) migrateTables() {
-	db.log.Notice("running database migrations")
-	db.migrateStateTables()
-	db.migrateProjectTables()
-	db.migrateTransactionTables()
-	db.log.Notice("database migrations completed")
+func (db *Db) migrateTables(cs string) error {
+	_, path, _, ok := runtime.Caller(0)
+	if !ok {
+		return fmt.Errorf("failed to get the current database migrations file path")
+	}
+	pathToMigrationFiles := filepath.Dir(path) + "/migrations"
+	m, err := migrate.New(fmt.Sprintf("file:%s", pathToMigrationFiles), cs)
+	if err != nil {
+		return fmt.Errorf("failed to create the database migrations: %s", err)
+	}
+	if err := m.Up(); err != nil {
+		if err == migrate.ErrNoChange {
+			return nil
+		}
+		return fmt.Errorf("failed to run the database migrations: %s", err)
+	}
+	return nil
 }

@@ -133,6 +133,6 @@ func (bld *blkDispatcher) load(blk *types.Block, th *common.Hash) *types.Transac
 	}
 
 	// update time stamp using the block data
-	trx.TimeStamp = time.Unix(int64(blk.TimeStamp), 0)
+	trx.Timestamp = time.Unix(int64(blk.TimeStamp), 0)
 	return trx
 }

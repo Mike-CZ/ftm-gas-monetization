@@ -14,6 +14,6 @@ type DB struct {
 	User     string
 	Password string
 	Host     string
-	Port     int
+	Port     string
 	Name     string
 }

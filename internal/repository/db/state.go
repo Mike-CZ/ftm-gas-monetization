@@ -15,17 +15,7 @@ const (
 	stateKeyLastProcessedEpoch = "last_epoch"
 )
 
-//goland:noinspection SqlDialectInspection,SqlNoDataSourceInspection
-var stateSchema = `
-CREATE TABLE IF NOT EXISTS state (
-    key VARCHAR PRIMARY KEY,
-    value TEXT
-);
-`
-
 // LastProcessedBlock returns the last processed block.
-//
-//goland:noinspection SqlDialectInspection,SqlNoDataSourceInspection
 func (db *Db) LastProcessedBlock(ctx context.Context) (uint64, error) {
 	db.log.Debugf("getting last block from the database")
 
@@ -45,8 +35,6 @@ func (db *Db) LastProcessedBlock(ctx context.Context) (uint64, error) {
 }
 
 // UpdateLastProcessedBlock updates the last processed block.
-//
-//goland:noinspection SqlDialectInspection,SqlNoDataSourceInspection
 func (db *Db) UpdateLastProcessedBlock(ctx context.Context, block uint64) error {
 	_, err := db.con.ExecContext(ctx,
 		"INSERT INTO state (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2",
@@ -61,8 +49,6 @@ func (db *Db) UpdateLastProcessedBlock(ctx context.Context, block uint64) error 
 }
 
 // LastProcessedEpoch returns the last processed epoch.
-//
-//goland:noinspection SqlDialectInspection,SqlNoDataSourceInspection
 func (db *Db) LastProcessedEpoch(ctx context.Context) (uint64, error) {
 	db.log.Debugf("getting last epoch from the database")
 
@@ -82,8 +68,6 @@ func (db *Db) LastProcessedEpoch(ctx context.Context) (uint64, error) {
 }
 
 // UpdateLastProcessedEpoch updates the last processed epoch.
-//
-//goland:noinspection SqlDialectInspection,SqlNoDataSourceInspection
 func (db *Db) UpdateLastProcessedEpoch(ctx context.Context, epoch uint64) error {
 	_, err := db.con.ExecContext(ctx,
 		"INSERT INTO state (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2",
@@ -95,12 +79,4 @@ func (db *Db) UpdateLastProcessedEpoch(ctx context.Context, epoch uint64) error 
 
 	db.log.Noticef("last epoch updated to %d", epoch)
 	return nil
-}
-
-// migrateStateTables migrates the state tables.
-func (db *Db) migrateStateTables() {
-	_, err := db.db.Exec(stateSchema)
-	if err != nil {
-		db.log.Panicf("failed to migrate state tables: %v", err)
-	}
 }

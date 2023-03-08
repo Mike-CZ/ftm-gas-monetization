@@ -22,7 +22,7 @@ type Repository struct {
 func New(cfg *config.Config, log *logger.AppLogger) *Repository {
 	repoLogger := log.ModuleLogger("repository")
 	repo := Repository{
-		db:  db.New(cfg, repoLogger),
+		db:  db.New(&cfg.DB, repoLogger),
 		rpc: rpc.New(cfg.OperaRpcUrl, repoLogger),
 		log: repoLogger,
 	}

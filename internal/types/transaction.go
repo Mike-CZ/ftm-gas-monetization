@@ -17,8 +17,8 @@ type Transaction struct {
 	// BlockNumber represents number of the block where this transaction was in. nil when it's pending.
 	BlockNumber *hexutil.Uint64 `json:"blockNumber" db:"block_number"`
 
-	// TimeStamp represents the time stamp of the transaction.
-	TimeStamp time.Time `json:"timestamp" db:"timestamp"`
+	// Timestamp represents the time stamp of the transaction.
+	Timestamp time.Time `json:"timestamp" db:"timestamp"`
 
 	// From represents address of the sender.
 	From *Address `json:"from" db:"from_address"`

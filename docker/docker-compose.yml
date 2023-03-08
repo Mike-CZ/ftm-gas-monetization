@@ -9,6 +9,7 @@ services:
     environment:
       - POSTGRES_USER=root
       - POSTGRES_PASSWORD=root
+      - POSTGRES_DB=gas_monetization
       - PGDATA=/data/postgres
 
   pgadmin:
