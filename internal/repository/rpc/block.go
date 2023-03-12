@@ -20,7 +20,7 @@ func (rpc *Rpc) BlockHeight() (*hexutil.Big, error) {
 
 	// call for data
 	var height hexutil.Big
-	err := rpc.ftm.Call(&height, "ftm_blockNumber")
+	err := rpc.ftm.Call(&height, "eth_blockNumber")
 	if err != nil {
 		rpc.log.Error("block height could not be obtained")
 		return nil, err

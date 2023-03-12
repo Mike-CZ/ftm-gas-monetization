@@ -6,14 +6,20 @@ import (
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/db"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
 	"github.com/ethereum/go-ethereum/common"
+	eth "github.com/ethereum/go-ethereum/core/types"
 	"time"
 )
+
+// EventHandler represents a function used to process event log record.
+type EventHandler func(*eth.Log, *db.Db)
 
 // blkDispatcher implements a service responsible for processing new blocks on the blockchain.
 type blkDispatcher struct {
 	service
 	inBlock       chan *types.Block
 	outDispatched chan uint64
+	// topics represents a map of topics to their respective event handlers.
+	topics map[common.Hash]EventHandler
 }
 
 // name returns the name of the service used by orchestrator.
@@ -25,6 +31,7 @@ func (bld *blkDispatcher) name() string {
 func (bld *blkDispatcher) init() {
 	bld.sigStop = make(chan struct{})
 	bld.outDispatched = make(chan uint64, blsBlockBufferCapacity)
+	bld.initTopics()
 }
 
 // run starts the block dispatcher
@@ -103,10 +110,29 @@ func (bld *blkDispatcher) processTxs(blk *types.Block) bool {
 			trx := bld.load(blk, th)
 			//TODO: What to do when transaction fails to load?
 			if trx != nil {
+				// store transaction
 				if err := db.StoreTransaction(ctx, trx); err != nil {
 					return err
 				}
+
+				// process logs
+				if trx.Logs != nil && len(trx.Logs) > 0 {
+					for _, log := range trx.Logs {
+						handler, ok := bld.topics[log.Topics[0]]
+						if ok && log.BlockNumber == uint64(blk.Number) {
+							bld.log.Warningf("known topic %s found, processing", log.Topics[0].String())
+							handler(&log, db)
+						}
+					}
+				}
 			}
+
+			//for _, log := range trx.Logs {
+			//	if err := db.StoreLog(ctx, log); err != nil {
+			//		return err
+			//	}
+			//}
+
 		}
 		// update last processed block number, so we can continue from here
 		if err := db.UpdateLastProcessedBlock(ctx, uint64(blk.Number)); err != nil {
@@ -135,4 +161,12 @@ func (bld *blkDispatcher) load(blk *types.Block, th *common.Hash) *types.Transac
 	// update time stamp using the block data
 	trx.Timestamp = time.Unix(int64(blk.TimeStamp), 0)
 	return trx
+}
+
+// initTopics initializes the map of topics to their respective event handlers.
+func (bld *blkDispatcher) initTopics() {
+	bld.topics = map[common.Hash]EventHandler{
+		/* ERC20/721::Approval(address, address, uint256) */
+		common.HexToHash("0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925"): handleProjectAdded,
+	}
 }

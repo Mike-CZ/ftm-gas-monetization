@@ -4,6 +4,7 @@ import (
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	eth "github.com/ethereum/go-ethereum/core/types"
 )
 
 // Transaction returns information about a blockchain transaction by hash.
@@ -24,6 +25,7 @@ func (rpc *Rpc) Transaction(hash *common.Hash) (*types.Transaction, error) {
 		// get transaction receipt
 		var rec struct {
 			GasUsed hexutil.Uint64 `json:"gasUsed"`
+			Logs    []eth.Log      `json:"logs"`
 		}
 
 		// call for the transaction receipt data
@@ -35,6 +37,7 @@ func (rpc *Rpc) Transaction(hash *common.Hash) (*types.Transaction, error) {
 
 		// copy some data
 		trx.GasUsed = &rec.GasUsed
+		trx.Logs = rec.Logs
 	}
 
 	// keep track of the operation

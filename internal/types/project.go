@@ -1,5 +1,6 @@
 package types
 
 type Project struct {
-	id uint64
+	Id              uint64   `db:"id"`
+	ReceiverAddress *Address `db:"receiver_address"`
 }

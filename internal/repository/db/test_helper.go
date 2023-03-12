@@ -44,6 +44,7 @@ func SetupTestDatabase(logger *logger.AppLogger) *TestDatabase {
 		logger)
 	if db == nil {
 		logger.Fatal("failed to create database instance")
+		_ = container.Terminate(context.Background())
 	}
 	return &TestDatabase{
 		Db:        db,
