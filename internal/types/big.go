@@ -35,9 +35,6 @@ func (b *Big) Scan(value interface{}) error {
 			b.Big = hexutil.Big{}
 			return nil
 		}
-		if len(v) > 2 && v[:2] == "0x" {
-			v = v[2:]
-		}
 		d, err := hex.DecodeString(v)
 		if err != nil {
 			return err

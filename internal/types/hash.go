@@ -2,7 +2,6 @@ package types
 
 import (
 	"database/sql/driver"
-	"encoding/hex"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -33,14 +32,8 @@ func (h *Hash) Scan(value interface{}) error {
 			h.Hash = common.Hash{}
 			return nil
 		}
-		if len(v) == common.HashLength {
-			copy(h.Hash[:], v)
-		} else if len(v) == common.HashLength*2+2 && v[:2] == "0x" {
-			b, err := hex.DecodeString(v[2:])
-			if err != nil {
-				return err
-			}
-			copy(h.Hash[:], b)
+		if len(v) == common.HashLength*2 || (len(v) == common.HashLength*2+2 && v[:2] == "0x") {
+			h.Hash = common.HexToHash(v)
 		} else {
 			return fmt.Errorf("invalid hash string %v", v)
 		}

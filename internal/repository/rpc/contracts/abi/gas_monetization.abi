@@ -2,18 +2,18 @@
     {
       "inputs": [
         {
+          "internalType": "address",
+          "name": "sfcAddress",
+          "type": "address"
+        },
+        {
           "internalType": "uint256",
-          "name": "withdrawalBlocksFrequencyLimit",
+          "name": "withdrawalEpochsFrequencyLimit",
           "type": "uint256"
         },
         {
           "internalType": "uint256",
           "name": "confirmationsToMakeWithdrawal",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "allowedConfirmationsDeviation",
           "type": "uint256"
         }
       ],
@@ -25,20 +25,20 @@
       "inputs": [
         {
           "indexed": false,
+          "internalType": "address",
+          "name": "sfcAddress",
+          "type": "address"
+        },
+        {
+          "indexed": false,
           "internalType": "uint256",
-          "name": "withdrawalBlocksFrequencyLimit",
+          "name": "withdrawalEpochsFrequencyLimit",
           "type": "uint256"
         },
         {
           "indexed": false,
           "internalType": "uint256",
           "name": "confirmationsToMakeWithdrawal",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "allowedConfirmationsDeviation",
           "type": "uint256"
         }
       ],
@@ -88,8 +88,51 @@
       "inputs": [
         {
           "indexed": true,
+          "internalType": "uint256",
+          "name": "projectId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "withdrawalEpochNumber",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "diffAmount",
+          "type": "uint256"
+        }
+      ],
+      "name": "InvalidWithdrawalAmount",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "projectId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
           "internalType": "address",
           "name": "owner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "rewardsRecipient",
           "type": "address"
         },
         {
@@ -97,6 +140,12 @@
           "internalType": "string",
           "name": "metadataUri",
           "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "activeFromEpoch",
+          "type": "uint256"
         },
         {
           "indexed": false,
@@ -113,9 +162,9 @@
       "inputs": [
         {
           "indexed": true,
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
+          "internalType": "uint256",
+          "name": "projectId",
+          "type": "uint256"
         },
         {
           "indexed": true,
@@ -132,9 +181,9 @@
       "inputs": [
         {
           "indexed": true,
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
+          "internalType": "uint256",
+          "name": "projectId",
+          "type": "uint256"
         },
         {
           "indexed": true,
@@ -151,18 +200,18 @@
       "inputs": [
         {
           "indexed": true,
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
+          "internalType": "uint256",
+          "name": "projectId",
+          "type": "uint256"
         },
         {
           "indexed": false,
-          "internalType": "address[]",
-          "name": "contracts",
-          "type": "address[]"
+          "internalType": "uint256",
+          "name": "enabledOnEpochNumber",
+          "type": "uint256"
         }
       ],
-      "name": "ProjectContractsSet",
+      "name": "ProjectEnabled",
       "type": "event"
     },
     {
@@ -170,9 +219,9 @@
       "inputs": [
         {
           "indexed": true,
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
+          "internalType": "uint256",
+          "name": "projectId",
+          "type": "uint256"
         },
         {
           "indexed": false,
@@ -189,12 +238,56 @@
       "inputs": [
         {
           "indexed": true,
+          "internalType": "uint256",
+          "name": "projectId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
           "internalType": "address",
           "name": "owner",
           "type": "address"
         }
       ],
-      "name": "ProjectRemoved",
+      "name": "ProjectOwnerUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "projectId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "recipient",
+          "type": "address"
+        }
+      ],
+      "name": "ProjectRewardsRecipientUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "projectId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "suspendedOnEpochNumber",
+          "type": "uint256"
+        }
+      ],
+      "name": "ProjectSuspended",
       "type": "event"
     },
     {
@@ -277,12 +370,12 @@
       "inputs": [
         {
           "indexed": false,
-          "internalType": "uint256",
-          "name": "limit",
-          "type": "uint256"
+          "internalType": "address",
+          "name": "sfcAddress",
+          "type": "address"
         }
       ],
-      "name": "WithdrawalBlockLimitUpdated",
+      "name": "SfcAddressUpdated",
       "type": "event"
     },
     {
@@ -290,33 +383,20 @@
       "inputs": [
         {
           "indexed": true,
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
-        },
-        {
-          "indexed": false,
           "internalType": "uint256",
-          "name": "blockNumber",
+          "name": "projectId",
           "type": "uint256"
-        }
-      ],
-      "name": "WithdrawalCanceled",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": true,
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
         },
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "blockNumber",
+          "name": "requestEpochNumber",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "withdrawalEpochNumber",
           "type": "uint256"
         },
         {
@@ -339,7 +419,7 @@
           "type": "uint256"
         }
       ],
-      "name": "WithdrawalConfirmationsDeviationUpdated",
+      "name": "WithdrawalConfirmationsLimitUpdated",
       "type": "event"
     },
     {
@@ -352,7 +432,7 @@
           "type": "uint256"
         }
       ],
-      "name": "WithdrawalConfirmationsLimitUpdated",
+      "name": "WithdrawalEpochsLimitUpdated",
       "type": "event"
     },
     {
@@ -360,14 +440,14 @@
       "inputs": [
         {
           "indexed": true,
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
+          "internalType": "uint256",
+          "name": "projectId",
+          "type": "uint256"
         },
         {
           "indexed": false,
           "internalType": "uint256",
-          "name": "blockNumber",
+          "name": "requestEpochNumber",
           "type": "uint256"
         }
       ],
@@ -454,6 +534,11 @@
           "type": "address"
         },
         {
+          "internalType": "address",
+          "name": "rewardsRecipient",
+          "type": "address"
+        },
+        {
           "internalType": "string",
           "name": "metadataUri",
           "type": "string"
@@ -472,9 +557,9 @@
     {
       "inputs": [
         {
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
+          "internalType": "uint256",
+          "name": "projectId",
+          "type": "uint256"
         },
         {
           "internalType": "address",
@@ -490,13 +575,13 @@
     {
       "inputs": [
         {
-          "internalType": "address payable",
-          "name": "owner",
-          "type": "address"
+          "internalType": "uint256",
+          "name": "projectId",
+          "type": "uint256"
         },
         {
           "internalType": "uint256",
-          "name": "blockNumber",
+          "name": "epochNumber",
           "type": "uint256"
         },
         {
@@ -506,6 +591,19 @@
         }
       ],
       "name": "completeWithdrawal",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "projectId",
+          "type": "uint256"
+        }
+      ],
+      "name": "enableProject",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -550,13 +648,13 @@
     {
       "inputs": [
         {
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
+          "internalType": "uint256",
+          "name": "projectId",
+          "type": "uint256"
         },
         {
           "internalType": "uint256",
-          "name": "blockId",
+          "name": "epochId",
           "type": "uint256"
         }
       ],
@@ -598,22 +696,9 @@
     {
       "inputs": [
         {
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
-        }
-      ],
-      "name": "removeProject",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
+          "internalType": "uint256",
+          "name": "projectId",
+          "type": "uint256"
         },
         {
           "internalType": "address",
@@ -645,7 +730,13 @@
       "type": "function"
     },
     {
-      "inputs": [],
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "projectId",
+          "type": "uint256"
+        }
+      ],
       "name": "requestWithdrawal",
       "outputs": [],
       "stateMutability": "nonpayable",
@@ -672,24 +763,6 @@
     {
       "inputs": [
         {
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
-        },
-        {
-          "internalType": "address[]",
-          "name": "contracts",
-          "type": "address[]"
-        }
-      ],
-      "name": "setProjectContracts",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
           "internalType": "bytes4",
           "name": "interfaceId",
           "type": "bytes4"
@@ -709,9 +782,22 @@
     {
       "inputs": [
         {
-          "internalType": "address",
-          "name": "owner",
-          "type": "address"
+          "internalType": "uint256",
+          "name": "projectId",
+          "type": "uint256"
+        }
+      ],
+      "name": "suspendProject",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "projectId",
+          "type": "uint256"
         },
         {
           "internalType": "string",
@@ -728,11 +814,16 @@
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "limit",
+          "name": "projectId",
           "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
         }
       ],
-      "name": "updateWithdrawalAllowedConfirmationsDeviation",
+      "name": "updateProjectOwner",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -741,11 +832,29 @@
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "limit",
+          "name": "projectId",
           "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "recipient",
+          "type": "address"
         }
       ],
-      "name": "updateWithdrawalBlocksFrequencyLimit",
+      "name": "updateProjectRewardsRecipient",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "sfc",
+          "type": "address"
+        }
+      ],
+      "name": "updateSfcAddress",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
@@ -759,6 +868,19 @@
         }
       ],
       "name": "updateWithdrawalConfirmationsLimit",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "limit",
+          "type": "uint256"
+        }
+      ],
+      "name": "updateWithdrawalEpochsFrequencyLimit",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"

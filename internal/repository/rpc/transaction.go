@@ -14,7 +14,7 @@ func (rpc *Rpc) Transaction(hash *common.Hash) (*types.Transaction, error) {
 
 	// call for data
 	var trx types.Transaction
-	err := rpc.ftm.Call(&trx, "ftm_getTransactionByHash", hash)
+	err := rpc.ftm.Call(&trx, "eth_getTransactionByHash", hash)
 	if err != nil {
 		rpc.log.Error("transaction could not be extracted")
 		return nil, err
@@ -29,7 +29,7 @@ func (rpc *Rpc) Transaction(hash *common.Hash) (*types.Transaction, error) {
 		}
 
 		// call for the transaction receipt data
-		err := rpc.ftm.Call(&rec, "ftm_getTransactionReceipt", hash)
+		err := rpc.ftm.Call(&rec, "eth_getTransactionReceipt", hash)
 		if err != nil {
 			rpc.log.Errorf("can not get receipt for transaction %s", hash)
 			return nil, err

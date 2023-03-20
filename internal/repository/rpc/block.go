@@ -39,7 +39,7 @@ func (rpc *Rpc) Block(numTag *string) (*types.Block, error) {
 
 	// call for data
 	var block types.Block
-	err := rpc.ftm.Call(&block, "ftm_getBlockByNumber", numTag, false)
+	err := rpc.ftm.Call(&block, "eth_getBlockByNumber", numTag, false)
 	if err != nil {
 		rpc.log.Error("block could not be extracted")
 		return nil, err
@@ -64,7 +64,7 @@ func (rpc *Rpc) BlockByHash(hash *string) (*types.Block, error) {
 
 	// call for data
 	var block types.Block
-	err := rpc.ftm.Call(&block, "ftm_getBlockByHash", hash, false)
+	err := rpc.ftm.Call(&block, "eth_getBlockByHash", hash, false)
 	if err != nil {
 		rpc.log.Error("block could not be extracted")
 		return nil, err
