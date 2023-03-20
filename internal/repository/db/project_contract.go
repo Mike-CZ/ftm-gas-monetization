@@ -24,6 +24,13 @@ func (qb *ProjectContractQueryBuilder) WhereProjectId(projectId uint64) *Project
 	return qb
 }
 
+// WhereAddress adds a where clause to the query builder.
+func (qb *ProjectContractQueryBuilder) WhereAddress(address *types.Address) *ProjectContractQueryBuilder {
+	qb.where = append(qb.where, "address = :address")
+	qb.parameters["address"] = address
+	return qb
+}
+
 // StoreProjectContract stores the project contract in the database.
 func (db *Db) StoreProjectContract(ctx context.Context, project *types.ProjectContract) error {
 	query := `INSERT INTO project_contract (project_id, address, is_enabled) VALUES (:project_id, :address, :is_enabled)`

@@ -18,6 +18,13 @@ func (db *Db) ProjectQuery(ctx context.Context) ProjectQueryBuilder {
 	}
 }
 
+// WhereProjectId adds a where clause to the query builder.
+func (qb *ProjectQueryBuilder) WhereProjectId(projectId uint64) *ProjectQueryBuilder {
+	qb.where = append(qb.where, "project_id = :project_id")
+	qb.parameters["project_id"] = projectId
+	return qb
+}
+
 // WhereOwner adds a where clause to the query builder.
 func (qb *ProjectQueryBuilder) WhereOwner(owner *types.Address) *ProjectQueryBuilder {
 	qb.where = append(qb.where, "owner_address = :owner_address")
@@ -54,6 +61,24 @@ func (db *Db) StoreProject(ctx context.Context, project *types.Project) error {
 		return err
 	}
 	project.Id = id
+
+	return nil
+}
+
+// UpdateProject updates the project in the database.
+func (db *Db) UpdateProject(ctx context.Context, project *types.Project) error {
+	if project.Id == 0 {
+		return fmt.Errorf("failed to update project %d: project id is 0", project.ProjectId)
+	}
+	query := `UPDATE project SET owner_address = :owner_address, receiver_address = :receiver_address,
+                   last_withdrawal_epoch = :last_withdrawal_epoch, active_from_epoch = :active_from_epoch, 
+                   active_to_epoch = :active_to_epoch WHERE id = :id`
+
+	_, err := sqlx.NamedExecContext(ctx, db.con, query, project)
+	if err != nil {
+		db.log.Errorf("failed to update project %d: %v", project.ProjectId, err)
+		return err
+	}
 
 	return nil
 }

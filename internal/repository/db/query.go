@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jmoiron/sqlx"
@@ -59,25 +60,47 @@ func (qb *queryBuilder[T]) GetAll() ([]T, error) {
 	return result, nil
 }
 
-// GetFirst returns the first result of the query. If no result is found, nil is returned.
-func (qb *queryBuilder[T]) GetFirst() (*T, error) {
+// GetFirstOrFail returns the first result of the query. If no result is found, an error is returned.
+func (qb *queryBuilder[T]) GetFirstOrFail() (*T, error) {
 	query := qb.buildSelectQuery() + " LIMIT 1"
 	rows, err := sqlx.NamedQueryContext(qb.ctx, qb.con, query, qb.parameters)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
 		return nil, err
 	}
 	defer rows.Close()
 	if !rows.Next() {
-		return nil, nil
+		return nil, fmt.Errorf("no result found for query: %s", query)
 	}
 	var result T
 	if err := rows.StructScan(&result); err != nil {
 		return nil, err
 	}
 	return &result, nil
+}
+
+// GetFirst returns the first result of the query. If no result is found, nil is returned.
+func (qb *queryBuilder[T]) GetFirst() (*T, error) {
+	result, err := qb.GetFirstOrFail()
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return result, nil
+}
+
+// Delete deletes all results of the query.
+func (qb *queryBuilder[T]) Delete() error {
+	query := "DELETE FROM " + qb.table
+	if len(qb.where) > 0 {
+		query += " WHERE " + strings.Join(qb.where, " AND ")
+	}
+	_, err := sqlx.NamedExecContext(qb.ctx, qb.con, query, qb.parameters)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // buildSelectQuery builds the select query string.
