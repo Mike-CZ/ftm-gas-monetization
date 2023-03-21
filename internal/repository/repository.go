@@ -35,6 +35,16 @@ func New(cfg *config.Config, log *logger.AppLogger) *Repository {
 	return &repo
 }
 
+// NewWithInstances creates a new repository from given instances.
+func NewWithInstances(db *db.Db, rpc *rpc.Rpc, log *logger.AppLogger) *Repository {
+	repo := Repository{
+		db:  db,
+		rpc: rpc,
+		log: log,
+	}
+	return &repo
+}
+
 // DatabaseTransaction runs the given function in a database transaction. The callback function is passed the repository
 // instance with the transaction as the connection. The transaction is automatically committed if the callback function
 // returns nil, otherwise it is rolled back. The callback function is passed a context that is cancelled after

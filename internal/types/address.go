@@ -2,7 +2,6 @@ package types
 
 import (
 	"database/sql/driver"
-	"encoding/hex"
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -33,14 +32,8 @@ func (a *Address) Scan(value interface{}) error {
 			a.Address = common.Address{}
 			return nil
 		}
-		if len(v) == common.AddressLength {
-			copy(a.Address[:], v)
-		} else if len(v) == common.AddressLength*2+2 && v[:2] == "0x" {
-			b, err := hex.DecodeString(v[2:])
-			if err != nil {
-				return err
-			}
-			copy(a.Address[:], b)
+		if len(v) == common.AddressLength*2 || (len(v) == common.AddressLength*2+2 && v[:2] == "0x") {
+			a.Address = common.HexToAddress(v)
 		} else {
 			return fmt.Errorf("invalid address string %v", v)
 		}

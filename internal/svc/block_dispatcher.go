@@ -14,6 +14,8 @@ type blkDispatcher struct {
 	service
 	inBlock       chan *types.Block
 	outDispatched chan uint64
+	// topics represents a map of topics to their respective event handlers.
+	topics map[common.Hash]EventHandler
 }
 
 // name returns the name of the service used by orchestrator.
@@ -25,6 +27,7 @@ func (bld *blkDispatcher) name() string {
 func (bld *blkDispatcher) init() {
 	bld.sigStop = make(chan struct{})
 	bld.outDispatched = make(chan uint64, blsBlockBufferCapacity)
+	bld.topics = topics()
 }
 
 // run starts the block dispatcher
@@ -71,16 +74,10 @@ func (bld *blkDispatcher) execute() {
 // process the given block by loading its content and sending block transactions
 // into the trx dispatcher. Observe terminate signal.
 func (bld *blkDispatcher) process(blk *types.Block) bool {
-	// dispatched block number is used by the block scanner
-	// to keep track of the work done vs. work pending
-	select {
-	case bld.outDispatched <- uint64(blk.Number):
-	case <-bld.sigStop:
-		return false
-	}
-
 	if blk.Txs == nil || len(blk.Txs) == 0 {
 		bld.log.Debugf("empty block #%d processed", blk.Number)
+		// send the block number to the block scanner
+		bld.outDispatched <- uint64(blk.Number)
 		return true
 	}
 
@@ -91,6 +88,10 @@ func (bld *blkDispatcher) process(blk *types.Block) bool {
 	}
 
 	bld.log.Debugf("block #%d processed", blk.Number)
+
+	// send the block number to the block scanner
+	bld.outDispatched <- uint64(blk.Number)
+
 	return true
 }
 
@@ -103,10 +104,31 @@ func (bld *blkDispatcher) processTxs(blk *types.Block) bool {
 			trx := bld.load(blk, th)
 			//TODO: What to do when transaction fails to load?
 			if trx != nil {
+				// store transaction
 				if err := db.StoreTransaction(ctx, trx); err != nil {
 					return err
 				}
+
+				// process logs
+				if trx.Logs != nil && len(trx.Logs) > 0 {
+					for _, log := range trx.Logs {
+						handler, ok := bld.topics[log.Topics[0]]
+						if ok && log.BlockNumber == uint64(blk.Number) {
+							bld.log.Infof("known topic %s found, processing", log.Topics[0].String())
+							if err := handler(ctx, &log, db, bld.repo); err != nil {
+								return err
+							}
+						}
+					}
+				}
 			}
+
+			//for _, log := range trx.Logs {
+			//	if err := db.StoreLog(ctx, log); err != nil {
+			//		return err
+			//	}
+			//}
+
 		}
 		// update last processed block number, so we can continue from here
 		if err := db.UpdateLastProcessedBlock(ctx, uint64(blk.Number)); err != nil {
