@@ -24,6 +24,16 @@ const (
 	withdrawalConfirmations = 1
 )
 
+var (
+	projectOwner     = types.Address{Address: common.HexToAddress("0x7E618Ee2D08fcb730f3fd8C3F4e7C7Fd1A166ABD")}
+	projectRecipient = types.Address{Address: common.HexToAddress("0xf54d3639B783B3d77cce0A6c2BcE042a201F8614")}
+	projectUri       = "test-uri"
+	projectContracts = []types.Address{
+		{Address: common.HexToAddress("0x8d2CfE86E5bc0D1a99f7848CE96B86AbCe72413F")},
+		{Address: common.HexToAddress("0x4B763D578273F5704cF5D57cF4A46452Ef5Cd659")},
+	}
+)
+
 type DispatcherTestSuite struct {
 	suite.Suite
 	testChain *TestChain
@@ -35,6 +45,7 @@ type DispatcherTestSuite struct {
 	adminSession           *contracts.GasMonetizationSession
 	funderSession          *contracts.GasMonetizationSession
 	projectsManagerSession *contracts.GasMonetizationSession
+	projectOwnerSession    *contracts.GasMonetizationSession
 	// sfc mock for obtaining the current epoch and session
 	sfcMockAddr common.Address
 	sfcMock     *contracts.SfcMock
@@ -100,68 +111,37 @@ func (s *DispatcherTestSuite) TestShiftEpochs() {
 
 // TestAddProject tests the addProject function
 func (s *DispatcherTestSuite) TestAddProject() {
-	err := s.addProject(
-		common.HexToAddress("0x9DCA89E400E8aAD271a92E6c4e2BaE86646Cb6C9"),
-		common.HexToAddress("0xf54d3639B783B3d77cce0A6c2BcE042a201F8614"),
-		"test-uri",
-		[]common.Address{
-			common.HexToAddress("0x8d2CfE86E5bc0D1a99f7848CE96B86AbCe72413F"),
-			common.HexToAddress("0x4B763D578273F5704cF5D57cF4A46452Ef5Cd659"),
-		},
-	)
-	assert.Nil(s.T(), err)
-	// process the latest block
-	s.processBlock(s.getLatestBlock())
+	s.setupTestProject()
 	// assert project was added
 	pq := s.testRepo.ProjectQuery()
-	pq.WhereOwner(&types.Address{Address: common.HexToAddress("0x9DCA89E400E8aAD271a92E6c4e2BaE86646Cb6C9")})
-	project, err := pq.GetFirstOrFail()
+	project, err := pq.WhereOwner(&projectOwner).GetFirstOrFail()
 	assert.Nil(s.T(), err)
 	assert.EqualValues(s.T(), uint64(1), project.ProjectId)
-	assert.EqualValues(s.T(), "0x9DCA89E400E8aAD271a92E6c4e2BaE86646Cb6C9", project.OwnerAddress.Hex())
-	assert.EqualValues(s.T(), "0xf54d3639B783B3d77cce0A6c2BcE042a201F8614", project.ReceiverAddress.Hex())
+	assert.EqualValues(s.T(), projectOwner.Hex(), project.OwnerAddress.Hex())
+	assert.EqualValues(s.T(), projectRecipient.Hex(), project.ReceiverAddress.Hex())
 	assert.Nil(s.T(), project.LastWithdrawalEpoch)
 	assert.EqualValues(s.T(), s.currentEpoch, project.ActiveFromEpoch)
 	assert.Nil(s.T(), project.ActiveToEpoch)
 	// assert contracts were added
 	pcq := s.testRepo.ProjectContractQuery()
-	pcq.WhereProjectId(project.ProjectId)
-	projectContracts, err := pcq.GetAll()
+	pcl, err := pcq.WhereProjectId(project.ProjectId).GetAll()
 	assert.Nil(s.T(), err)
 	assert.Len(s.T(), projectContracts, 2)
-	for i, pc := range projectContracts {
+	for i, pc := range pcl {
 		assert.EqualValues(s.T(), project.Id, pc.ProjectId)
 		assert.True(s.T(), pc.Enabled)
-		assert.EqualValues(
-			s.T(),
-			[]string{
-				"0x8d2CfE86E5bc0D1a99f7848CE96B86AbCe72413F",
-				"0x4B763D578273F5704cF5D57cF4A46452Ef5Cd659",
-			}[i],
-			pc.Address.Hex())
+		assert.EqualValues(s.T(), projectContracts[i].Address.Hex(), pc.Address.Hex())
 	}
 }
 
 // TestProjectSuspensionAndActivation tests the project suspension and activation
 func (s *DispatcherTestSuite) TestProjectSuspensionAndActivation() {
-	err := s.addProject(
-		common.HexToAddress("0x9DCA89E400E8aAD271a92E6c4e2BaE86646Cb6C9"),
-		common.HexToAddress("0xf54d3639B783B3d77cce0A6c2BcE042a201F8614"),
-		"test-uri",
-		[]common.Address{
-			common.HexToAddress("0x8d2CfE86E5bc0D1a99f7848CE96B86AbCe72413F"),
-			common.HexToAddress("0x4B763D578273F5704cF5D57cF4A46452Ef5Cd659"),
-		},
-	)
-	assert.Nil(s.T(), err)
-	// process the latest block
-	s.processBlock(s.getLatestBlock())
+	s.setupTestProject()
 	// shift epochs
 	s.shiftEpochs(10)
 	// get project
 	pq := s.testRepo.ProjectQuery()
-	pq.WhereOwner(&types.Address{Address: common.HexToAddress("0x9DCA89E400E8aAD271a92E6c4e2BaE86646Cb6C9")})
-	project, err := pq.GetFirstOrFail()
+	project, err := pq.WhereOwner(&projectOwner).GetFirstOrFail()
 	assert.Nil(s.T(), err)
 	assert.Nil(s.T(), project.ActiveToEpoch)
 	// suspend project
@@ -189,74 +169,124 @@ func (s *DispatcherTestSuite) TestProjectSuspensionAndActivation() {
 
 // TestAddContract tests the add contract functionality
 func (s *DispatcherTestSuite) TestAddContract() {
-	err := s.addProject(
-		common.HexToAddress("0x9DCA89E400E8aAD271a92E6c4e2BaE86646Cb6C9"),
-		common.HexToAddress("0xf54d3639B783B3d77cce0A6c2BcE042a201F8614"),
-		"test-uri",
-		[]common.Address{
-			common.HexToAddress("0x8d2CfE86E5bc0D1a99f7848CE96B86AbCe72413F"),
-			common.HexToAddress("0x4B763D578273F5704cF5D57cF4A46452Ef5Cd659"),
-		},
-	)
-	assert.Nil(s.T(), err)
-	// process the latest block
-	s.processBlock(s.getLatestBlock())
+	s.setupTestProject()
+	contractAddr := types.Address{Address: common.HexToAddress("0xFA76958E85faB71A8B9e4AAAE59D55a1f54f2B42")}
 	// assert the contract does not exist
 	pcq := s.testRepo.ProjectContractQuery()
-	pcq.WhereAddress(&types.Address{Address: common.HexToAddress("0xFA76958E85faB71A8B9e4AAAE59D55a1f54f2B42")})
-	_, err = pcq.GetFirstOrFail()
+	_, err := pcq.WhereAddress(&contractAddr).GetFirstOrFail()
 	assert.NotNil(s.T(), err)
 	// add contract
-	_, err = s.projectsManagerSession.AddProjectContract(
-		new(big.Int).SetUint64(1),
-		common.HexToAddress("0xFA76958E85faB71A8B9e4AAAE59D55a1f54f2B42"),
-	)
+	_, err = s.projectsManagerSession.AddProjectContract(new(big.Int).SetUint64(1), contractAddr.Address)
 	assert.Nil(s.T(), err)
 	// process the latest block
 	s.processBlock(s.getLatestBlock())
 	// get project
 	pq := s.testRepo.ProjectQuery()
-	pq.WhereOwner(&types.Address{Address: common.HexToAddress("0x9DCA89E400E8aAD271a92E6c4e2BaE86646Cb6C9")})
-	project, err := pq.GetFirstOrFail()
+	project, err := pq.WhereOwner(&projectOwner).GetFirstOrFail()
 	assert.Nil(s.T(), err)
 	// assert the contract exists
 	c, err := pcq.GetFirstOrFail()
 	assert.Nil(s.T(), err)
 	assert.EqualValues(s.T(), project.Id, c.ProjectId)
-	assert.EqualValues(s.T(), common.HexToAddress("0xFA76958E85faB71A8B9e4AAAE59D55a1f54f2B42"), c.Address.Address)
+	assert.EqualValues(s.T(), contractAddr.Hex(), c.Address.Hex())
 	assert.True(s.T(), c.Enabled)
 }
 
 // TestAddContract tests the remove contract functionality
 func (s *DispatcherTestSuite) TestRemoveContract() {
-	err := s.addProject(
-		common.HexToAddress("0x9DCA89E400E8aAD271a92E6c4e2BaE86646Cb6C9"),
-		common.HexToAddress("0xf54d3639B783B3d77cce0A6c2BcE042a201F8614"),
-		"test-uri",
-		[]common.Address{
-			common.HexToAddress("0x8d2CfE86E5bc0D1a99f7848CE96B86AbCe72413F"),
-			common.HexToAddress("0x4B763D578273F5704cF5D57cF4A46452Ef5Cd659"),
-		},
-	)
-	assert.Nil(s.T(), err)
-	// process the latest block
-	s.processBlock(s.getLatestBlock())
+	s.setupTestProject()
 	// assert the contract does exist
 	pcq := s.testRepo.ProjectContractQuery()
-	pcq.WhereAddress(&types.Address{Address: common.HexToAddress("0x8d2CfE86E5bc0D1a99f7848CE96B86AbCe72413F")})
-	_, err = pcq.GetFirstOrFail()
+	_, err := pcq.WhereAddress(&projectContracts[0]).GetFirstOrFail()
 	assert.Nil(s.T(), err)
 	// remove contract
-	_, err = s.projectsManagerSession.RemoveProjectContract(
-		new(big.Int).SetUint64(1),
-		common.HexToAddress("0x8d2CfE86E5bc0D1a99f7848CE96B86AbCe72413F"),
-	)
+	_, err = s.projectsManagerSession.RemoveProjectContract(new(big.Int).SetUint64(1), projectContracts[0].Address)
 	assert.Nil(s.T(), err)
 	// process the latest block
 	s.processBlock(s.getLatestBlock())
 	// assert the contract does not exist
 	_, err = pcq.GetFirstOrFail()
 	assert.NotNil(s.T(), err)
+	// assert the other contract still exists
+	pcq = s.testRepo.ProjectContractQuery()
+	_, err = pcq.WhereAddress(&projectContracts[1]).GetFirstOrFail()
+	assert.Nil(s.T(), err)
+}
+
+// TestUpdateUri tests the update uri functionality
+func (s *DispatcherTestSuite) TestUpdateUri() {
+	s.setupTestProject()
+	// assert the contract does exist
+	pq := s.testRepo.ProjectQuery()
+	_, err := pq.WhereOwner(&projectOwner).GetFirstOrFail()
+	assert.Nil(s.T(), err)
+	// remove contract
+	_, err = s.projectsManagerSession.UpdateProjectMetadataUri(
+		new(big.Int).SetUint64(1),
+		"new-uri",
+	)
+	assert.Nil(s.T(), err)
+	// process the latest block
+	s.processBlock(s.getLatestBlock())
+	// TODO: assert metadata changed
+}
+
+// TestUpdateRewardsRecipient tests the update rewards recipient functionality
+func (s *DispatcherTestSuite) TestUpdateRewardsRecipient() {
+	s.setupTestProject()
+	// fetch project
+	pq := s.testRepo.ProjectQuery()
+	project, err := pq.WhereOwner(&projectOwner).GetFirstOrFail()
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), projectRecipient.Hex(), project.ReceiverAddress.Hex())
+	// update recipient
+	addr := types.Address{Address: common.HexToAddress("0xFA76958E85faB71A8B9e4AAAE59D55a1f54f2B42")}
+	_, err = s.projectOwnerSession.UpdateProjectRewardsRecipient(new(big.Int).SetUint64(1), addr.Address)
+	assert.Nil(s.T(), err)
+	// process the latest block
+	s.processBlock(s.getLatestBlock())
+	// assert recipient updated
+	project, err = pq.GetFirstOrFail()
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), addr.Hex(), project.ReceiverAddress.Hex())
+}
+
+// TestUpdateOwner tests the update owner functionality
+func (s *DispatcherTestSuite) TestUpdateOwner() {
+	s.setupTestProject()
+	// fetch project
+	pq := s.testRepo.ProjectQuery()
+	project, err := pq.WhereOwner(&projectOwner).GetFirstOrFail()
+	id := project.Id
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), projectRecipient.Hex(), project.ReceiverAddress.Hex())
+	// update recipient
+	addr := types.Address{Address: common.HexToAddress("0xFA76958E85faB71A8B9e4AAAE59D55a1f54f2B42")}
+	_, err = s.projectsManagerSession.UpdateProjectOwner(new(big.Int).SetUint64(1), addr.Address)
+	assert.Nil(s.T(), err)
+	// process the latest block
+	s.processBlock(s.getLatestBlock())
+	// assert owner updated
+	pq = s.testRepo.ProjectQuery()
+	project, err = pq.WhereOwner(&addr).GetFirstOrFail()
+	assert.Nil(s.T(), err)
+	assert.NotNil(s.T(), project)
+	assert.EqualValues(s.T(), id, project.Id)
+}
+
+// TestUpdateOwner tests the update owner functionality
+func (s *DispatcherTestSuite) TestWithdrawalRequest() {
+	s.setupTestProject()
+	s.shiftEpochs(100)
+
+	// process the latest block
+	s.processBlock(s.getLatestBlock())
+	// assert owner updated
+	pq = s.testRepo.ProjectQuery()
+	project, err = pq.WhereOwner(&addr).GetFirstOrFail()
+	assert.Nil(s.T(), err)
+	assert.NotNil(s.T(), project)
+	assert.EqualValues(s.T(), id, project.Id)
 }
 
 // initializeSfc deploys the sfc mock contract to the test chain
@@ -344,6 +374,7 @@ func (s *DispatcherTestSuite) initializeGasMonetizationSessions() {
 	s.adminSession = initializeGasMonetizationSession(s.T(), s.gasMonetization, s.testChain.AdminAcc.PrivateKey)
 	s.funderSession = initializeGasMonetizationSession(s.T(), s.gasMonetization, s.testChain.FunderAcc.PrivateKey)
 	s.projectsManagerSession = initializeGasMonetizationSession(s.T(), s.gasMonetization, s.testChain.ProjectsManagerAcc.PrivateKey)
+	s.projectOwnerSession = initializeGasMonetizationSession(s.T(), s.gasMonetization, s.testChain.ProjectOwnerAcc.PrivateKey)
 }
 
 // initializeSfcSession initializes a session for sfc mock
@@ -445,6 +476,18 @@ func (s *DispatcherTestSuite) addProject(
 		return err
 	}
 	return nil
+}
+
+// addProject adds a project to gas monetization contract
+func (s *DispatcherTestSuite) setupTestProject() {
+	var contractAddresses []common.Address
+	for _, addr := range projectContracts {
+		contractAddresses = append(contractAddresses, addr.Address)
+	}
+	err := s.addProject(projectOwner.Address, projectRecipient.Address, projectUri, contractAddresses)
+	assert.Nil(s.T(), err)
+	// process the latest block
+	s.processBlock(s.getLatestBlock())
 }
 
 // getLatestBlock returns the latest block

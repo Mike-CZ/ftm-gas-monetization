@@ -23,6 +23,9 @@ func topics() map[common.Hash]EventHandler {
 		common.HexToHash("0x0737ed2cc6eb4cf4aefb6d1e1404305301a64cae58ccf508828a20412fb77f35"): handleProjectEnabled,
 		common.HexToHash("0xf83ba82192ce64f0fd48145ca2b60956a005a2d4e28f14fb099fad71294b8ff3"): handleProjectContractAdded,
 		common.HexToHash("0xd32f2e923c29ff9e7231f459d69add67f769d05c5069c23bbdea536fc0cf154a"): handleProjectContractRemoved,
+		common.HexToHash("0x781779743e625d6e652139cabc7e7c736ad376a0f1302b1b5c346548d948c72e"): handleProjectMetadataUriUpdated,
+		common.HexToHash("0xc96c5102d284d786d29b5d0d7dda6ce493724355b762993adfef62b7220f161c"): handleProjectRecipientUpdated,
+		common.HexToHash("0xffc579e983741c17a95792c458e2ae8c933b1bf7f5cd84f3bca571505c25d42a"): handleProjectOwnerUpdated,
 	}
 }
 
@@ -168,6 +171,77 @@ func handleProjectContractRemoved(ctx context.Context, log *eth.Log, db *db.Db, 
 	addr := types.Address{Address: common.BytesToAddress(log.Topics[2].Bytes())}
 	if err := qb.WhereAddress(&addr).Delete(); err != nil {
 		return fmt.Errorf("failed to delete contract %s for project #%d: %v", addr.Hex(), log.Topics[1].Big().Uint64(), err)
+	}
+	return nil
+}
+
+// handleProjectMetadataUriUpdated is an event handler for the ProjectMetadataUriUpdated event.
+func handleProjectMetadataUriUpdated(ctx context.Context, log *eth.Log, db *db.Db, repo *repository.Repository) error {
+	if len(log.Topics) != 2 {
+		return nil
+	}
+	// parse event data
+	eventData := make(map[string]interface{})
+	err := repo.GasMonetizationAbi().UnpackIntoMap(eventData, "ProjectMetadataUriUpdated", log.Data)
+	if err != nil {
+		return fmt.Errorf("failed to unpack ProjectMetadataUriUpdated event #%d/#%d: %v", log.BlockNumber, log.Index, err)
+	}
+	// TODO: update metadata
+	//projectId := log.Topics[1].Big().Uint64()
+	//uri := eventData["metadataUri"].(string)
+	return nil
+}
+
+// handleProjectRecipientUpdated is an event handler for the ProjectRewardsRecipientUpdated event.
+func handleProjectRecipientUpdated(ctx context.Context, log *eth.Log, db *db.Db, repo *repository.Repository) error {
+	if len(log.Topics) != 2 {
+		return nil
+	}
+	// parse event data
+	eventData := make(map[string]interface{})
+	err := repo.GasMonetizationAbi().UnpackIntoMap(eventData, "ProjectRewardsRecipientUpdated", log.Data)
+	if err != nil {
+		return fmt.Errorf("failed to unpack ProjectRewardsRecipientUpdated event #%d/#%d: %v", log.BlockNumber, log.Index, err)
+	}
+	// fetch project
+	pq := db.ProjectQuery(ctx)
+	project, err := pq.WhereProjectId(log.Topics[1].Big().Uint64()).GetFirstOrFail()
+	if err != nil {
+		return fmt.Errorf("failed to get project #%d: %v", log.Topics[1].Big().Uint64(), err)
+	}
+	// update recipient
+	recipient := types.Address{Address: eventData["recipient"].(common.Address)}
+	project.ReceiverAddress = &recipient
+	err = db.UpdateProject(ctx, project)
+	if err != nil {
+		return fmt.Errorf("failed to update recipient %s for project #%d: %v", recipient.Hex(), project.ProjectId, err)
+	}
+	return nil
+}
+
+// handleProjectOwnerUpdated is an event handler for the ProjectOwnerUpdated event.
+func handleProjectOwnerUpdated(ctx context.Context, log *eth.Log, db *db.Db, repo *repository.Repository) error {
+	if len(log.Topics) != 2 {
+		return nil
+	}
+	// parse event data
+	eventData := make(map[string]interface{})
+	err := repo.GasMonetizationAbi().UnpackIntoMap(eventData, "ProjectOwnerUpdated", log.Data)
+	if err != nil {
+		return fmt.Errorf("failed to unpack ProjectOwnerUpdated event #%d/#%d: %v", log.BlockNumber, log.Index, err)
+	}
+	// fetch project
+	pq := db.ProjectQuery(ctx)
+	project, err := pq.WhereProjectId(log.Topics[1].Big().Uint64()).GetFirstOrFail()
+	if err != nil {
+		return fmt.Errorf("failed to get project #%d: %v", log.Topics[1].Big().Uint64(), err)
+	}
+	// update owner
+	owner := types.Address{Address: eventData["owner"].(common.Address)}
+	project.OwnerAddress = &owner
+	err = db.UpdateProject(ctx, project)
+	if err != nil {
+		return fmt.Errorf("failed to update owner %s for project #%d: %v", owner.Hex(), project.ProjectId, err)
 	}
 	return nil
 }
