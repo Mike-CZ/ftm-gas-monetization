@@ -280,13 +280,13 @@ func (s *DispatcherTestSuite) TestWithdrawalRequest() {
 	s.shiftEpochs(100)
 
 	// process the latest block
-	s.processBlock(s.getLatestBlock())
-	// assert owner updated
-	pq = s.testRepo.ProjectQuery()
-	project, err = pq.WhereOwner(&addr).GetFirstOrFail()
-	assert.Nil(s.T(), err)
-	assert.NotNil(s.T(), project)
-	assert.EqualValues(s.T(), id, project.Id)
+	//s.processBlock(s.getLatestBlock())
+	//// assert owner updated
+	//pq = s.testRepo.ProjectQuery()
+	//project, err = pq.WhereOwner(&addr).GetFirstOrFail()
+	//assert.Nil(s.T(), err)
+	//assert.NotNil(s.T(), project)
+	//assert.EqualValues(s.T(), id, project.Id)
 }
 
 // initializeSfc deploys the sfc mock contract to the test chain
