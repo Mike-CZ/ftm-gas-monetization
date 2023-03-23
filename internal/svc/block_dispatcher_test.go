@@ -278,31 +278,33 @@ func (s *DispatcherTestSuite) TestUpdateOwner() {
 func (s *DispatcherTestSuite) TestWithdrawalRequest() {
 	s.setupTestProject()
 	s.shiftEpochs(100)
-
+	// fund the contract
+	s.fundContract(new(big.Int).SetUint64(5_000))
+	// request withdrawal
+	_, err := s.projectOwnerSession.RequestWithdrawal(new(big.Int).SetUint64(1))
+	assert.Nil(s.T(), err)
 	// process the latest block
-	//s.processBlock(s.getLatestBlock())
-	//// assert owner updated
-	//pq = s.testRepo.ProjectQuery()
-	//project, err = pq.WhereOwner(&addr).GetFirstOrFail()
-	//assert.Nil(s.T(), err)
-	//assert.NotNil(s.T(), project)
-	//assert.EqualValues(s.T(), id, project.Id)
+	s.processBlock(s.getLatestBlock())
+	// fetch project
+	pq := s.testRepo.ProjectQuery()
+	project, err := pq.WhereOwner(&projectOwner).GetFirstOrFail()
+	assert.Nil(s.T(), err)
+	// assert withdrawal request exists
+	wrq := s.testRepo.WithdrawalRequestQuery()
+	wr, err := wrq.WhereProjectId(project.Id).GetFirstOrFail()
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), project.Id, wr.ProjectId)
+	assert.EqualValues(s.T(), s.currentEpoch, wr.Epoch)
 }
 
 // initializeSfc deploys the sfc mock contract to the test chain
 func (s *DispatcherTestSuite) initializeSfc() {
 	auth, err := bind.NewKeyedTransactorWithChainID(s.testChain.AdminAcc.PrivateKey, big.NewInt(TestChainId))
-	if err != nil {
-		s.T().Fatal(err)
-	}
+	assert.Nil(s.T(), err)
 	address, _, _, err := contracts.DeploySfcMock(auth, s.testChain.RawRpc)
-	if err != nil {
-		s.T().Fatal(err)
-	}
+	assert.Nil(s.T(), err)
 	sfcMock, err := contracts.NewSfcMock(address, s.testChain.RawRpc)
-	if err != nil {
-		s.T().Fatal(err)
-	}
+	assert.Nil(s.T(), err)
 	s.sfcMock = sfcMock
 	s.sfcMockAddr = address
 }
@@ -310,19 +312,13 @@ func (s *DispatcherTestSuite) initializeSfc() {
 // initializeGasMonetization deploys the contract to the test chain
 func (s *DispatcherTestSuite) initializeGasMonetization() {
 	auth, err := bind.NewKeyedTransactorWithChainID(s.testChain.AdminAcc.PrivateKey, big.NewInt(TestChainId))
-	if err != nil {
-		s.T().Fatal(err)
-	}
+	assert.Nil(s.T(), err)
 	address, _, _, err := contracts.DeployGasMonetization(
 		auth, s.testChain.RawRpc, s.sfcMockAddr, big.NewInt(withdrawalFrequency), big.NewInt(withdrawalConfirmations),
 	)
-	if err != nil {
-		s.T().Fatal(err)
-	}
+	assert.Nil(s.T(), err)
 	gasMonetization, err := contracts.NewGasMonetization(address, s.testChain.RawRpc)
-	if err != nil {
-		s.T().Fatal(err)
-	}
+	assert.Nil(s.T(), err)
 	s.gasMonetization = gasMonetization
 	s.gasMonetizationAddr = address
 }
@@ -380,9 +376,7 @@ func (s *DispatcherTestSuite) initializeGasMonetizationSessions() {
 // initializeSfcSession initializes a session for sfc mock
 func (s *DispatcherTestSuite) initializeSfcSession() {
 	auth, err := bind.NewKeyedTransactorWithChainID(s.testChain.AdminAcc.PrivateKey, big.NewInt(TestChainId))
-	if err != nil {
-		s.T().Fatal(err)
-	}
+	assert.Nil(s.T(), err)
 	s.sfcSession = &contracts.SfcMockSession{
 		Contract: s.sfcMock,
 		CallOpts: bind.CallOpts{},
@@ -400,9 +394,7 @@ func initializeGasMonetizationSession(
 	gasMonetization *contracts.GasMonetization,
 	key *ecdsa.PrivateKey) *contracts.GasMonetizationSession {
 	auth, err := bind.NewKeyedTransactorWithChainID(key, big.NewInt(TestChainId))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Nil(t, err)
 	return &contracts.GasMonetizationSession{
 		Contract: gasMonetization,
 		CallOpts: bind.CallOpts{},
@@ -417,51 +409,27 @@ func initializeGasMonetizationSession(
 // getCurrentBlockId returns the current block id
 func (s *DispatcherTestSuite) getCurrentBlockId() *big.Int {
 	block, err := s.testChain.BlockHeight()
-	if err != nil {
-		s.T().Fatal(err)
-	}
+	assert.Nil(s.T(), err)
 	return block.ToInt()
 }
 
 // initializeGasMonetizationRoles assigns roles to the test accounts
 func (s *DispatcherTestSuite) initializeGasMonetizationRoles() {
 	funderRole, err := s.gasMonetization.FUNDERROLE(nil)
-	if err != nil {
-		s.T().Fatal(err)
-	}
+	assert.Nil(s.T(), err)
 	_, err = s.adminSession.GrantRole(funderRole, s.testChain.FunderAcc.Address)
-	if err != nil {
-		s.T().Fatal(err)
-	}
+	assert.Nil(s.T(), err)
 	projectsManagerRole, err := s.gasMonetization.PROJECTSMANAGERROLE(nil)
-	if err != nil {
-		s.T().Fatal(err)
-	}
+	assert.Nil(s.T(), err)
 	_, err = s.adminSession.GrantRole(projectsManagerRole, s.testChain.ProjectsManagerAcc.Address)
-	if err != nil {
-		s.T().Fatal(err)
-	}
-}
-
-func addFunds(session *contracts.GasMonetizationSession, amount *big.Int) error {
-	// set amount to send
-	session.TransactOpts.Value = amount
-	_, err := session.AddFunds()
-	if err != nil {
-		return err
-	}
-	// reset amount to send
-	session.TransactOpts.Value = nil
-	return nil
+	assert.Nil(s.T(), err)
 }
 
 // shiftEpochs shifts the current epoch by the given number of epochs
 func (s *DispatcherTestSuite) shiftEpochs(epochs uint64) {
 	s.currentEpoch += epochs
 	_, err := s.sfcSession.SetEpoch(big.NewInt(int64(s.currentEpoch)))
-	if err != nil {
-		s.T().Fatal("failed to shift epoch: ", err)
-	}
+	assert.Nil(s.T(), err)
 }
 
 // addProject adds a project to gas monetization contract
@@ -470,12 +438,19 @@ func (s *DispatcherTestSuite) addProject(
 	recipient common.Address,
 	metadataUri string,
 	contracts []common.Address,
-) error {
+) {
 	_, err := s.projectsManagerSession.AddProject(owner, recipient, metadataUri, contracts)
-	if err != nil {
-		return err
-	}
-	return nil
+	assert.Nil(s.T(), err)
+}
+
+// fundContract funds the gas monetization contract
+func (s *DispatcherTestSuite) fundContract(amount *big.Int) {
+	// set amount to send
+	s.funderSession.TransactOpts.Value = amount
+	_, err := s.funderSession.AddFunds()
+	assert.Nil(s.T(), err)
+	// reset amount to send
+	s.funderSession.TransactOpts.Value = nil
 }
 
 // addProject adds a project to gas monetization contract
@@ -484,8 +459,7 @@ func (s *DispatcherTestSuite) setupTestProject() {
 	for _, addr := range projectContracts {
 		contractAddresses = append(contractAddresses, addr.Address)
 	}
-	err := s.addProject(projectOwner.Address, projectRecipient.Address, projectUri, contractAddresses)
-	assert.Nil(s.T(), err)
+	s.addProject(projectOwner.Address, projectRecipient.Address, projectUri, contractAddresses)
 	// process the latest block
 	s.processBlock(s.getLatestBlock())
 }
@@ -493,9 +467,7 @@ func (s *DispatcherTestSuite) setupTestProject() {
 // getLatestBlock returns the latest block
 func (s *DispatcherTestSuite) getLatestBlock() *types.Block {
 	block, err := s.testRepo.BlockByNumber(nil)
-	if err != nil {
-		s.T().Fatal(err)
-	}
+	assert.Nil(s.T(), err)
 	return block
 }
 

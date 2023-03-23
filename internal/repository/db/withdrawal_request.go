@@ -18,7 +18,7 @@ func (db *Db) WithdrawalRequestQuery(ctx context.Context) WithdrawalRequestQuery
 }
 
 // WhereProjectId adds a where clause to the query builder.
-func (qb *WithdrawalRequestQueryBuilder) WhereProjectId(projectId uint64) *WithdrawalRequestQueryBuilder {
+func (qb *WithdrawalRequestQueryBuilder) WhereProjectId(projectId int64) *WithdrawalRequestQueryBuilder {
 	qb.where = append(qb.where, "project_id = :project_id")
 	qb.parameters["project_id"] = projectId
 	return qb

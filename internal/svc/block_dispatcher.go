@@ -3,6 +3,7 @@ package svc
 
 import (
 	"context"
+	"fmt"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/db"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
 	"github.com/ethereum/go-ethereum/common"
@@ -27,7 +28,7 @@ func (bld *blkDispatcher) name() string {
 func (bld *blkDispatcher) init() {
 	bld.sigStop = make(chan struct{})
 	bld.outDispatched = make(chan uint64, blsBlockBufferCapacity)
-	bld.topics = topics()
+	bld.initializeTopics()
 }
 
 // run starts the block dispatcher
@@ -102,33 +103,25 @@ func (bld *blkDispatcher) processTxs(blk *types.Block) bool {
 	err := bld.repo.DatabaseTransaction(func(ctx context.Context, db *db.Db) error {
 		for _, th := range blk.Txs {
 			trx := bld.load(blk, th)
-			//TODO: What to do when transaction fails to load?
-			if trx != nil {
-				// store transaction
-				if err := db.StoreTransaction(ctx, trx); err != nil {
-					return err
-				}
-
-				// process logs
-				if trx.Logs != nil && len(trx.Logs) > 0 {
-					for _, log := range trx.Logs {
-						handler, ok := bld.topics[log.Topics[0]]
-						if ok && log.BlockNumber == uint64(blk.Number) {
-							bld.log.Infof("known topic %s found, processing", log.Topics[0].String())
-							if err := handler(ctx, &log, db, bld.repo); err != nil {
-								return err
-							}
+			if trx == nil {
+				return fmt.Errorf("failed to load transaction %s", th.String())
+			}
+			// store transaction
+			if err := db.StoreTransaction(ctx, trx); err != nil {
+				return err
+			}
+			// process logs
+			if trx.Logs != nil && len(trx.Logs) > 0 {
+				for _, log := range trx.Logs {
+					handler, ok := bld.topics[log.Topics[0]]
+					if ok && log.BlockNumber == uint64(blk.Number) {
+						bld.log.Infof("known topic %s found, processing", log.Topics[0].String())
+						if err := handler(ctx, &log, db); err != nil {
+							return err
 						}
 					}
 				}
 			}
-
-			//for _, log := range trx.Logs {
-			//	if err := db.StoreLog(ctx, log); err != nil {
-			//		return err
-			//	}
-			//}
-
 		}
 		// update last processed block number, so we can continue from here
 		if err := db.UpdateLastProcessedBlock(ctx, uint64(blk.Number)); err != nil {
