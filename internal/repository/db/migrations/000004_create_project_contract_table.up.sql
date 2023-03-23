@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS project_contract (
+CREATE TABLE IF NOT EXISTS project_contract(
     id serial PRIMARY KEY,
     project_id INT NOT NULL,
     address VARCHAR(40) NOT NULL,

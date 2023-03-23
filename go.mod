@@ -1,6 +1,6 @@
 module github.com/Mike-CZ/ftm-gas-monetization
 
-go 1.19
+go 1.20
 
 require (
 	github.com/ethereum/go-ethereum v1.11.4
@@ -23,7 +23,6 @@ require (
 	github.com/containerd/containerd v1.6.17 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect

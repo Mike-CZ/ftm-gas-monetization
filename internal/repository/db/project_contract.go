@@ -34,12 +34,10 @@ func (qb *ProjectContractQueryBuilder) WhereAddress(address *types.Address) *Pro
 // StoreProjectContract stores the project contract in the database.
 func (db *Db) StoreProjectContract(ctx context.Context, project *types.ProjectContract) error {
 	query := `INSERT INTO project_contract (project_id, address, is_enabled) VALUES (:project_id, :address, :is_enabled)`
-
 	_, err := sqlx.NamedExecContext(ctx, db.con, query, project)
 	if err != nil {
 		db.log.Errorf("failed to store project contract %d: %v", project.Address.Hex(), err)
 		return err
 	}
-
 	return nil
 }

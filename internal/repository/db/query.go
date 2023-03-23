@@ -32,6 +32,13 @@ func newQueryBuilder[T any](ctx context.Context, con sqlx.ExtContext, table stri
 	}
 }
 
+// WhereId adds a where clause to the query builder.
+func (qb *queryBuilder[T]) WhereId(id int64) *queryBuilder[T] {
+	qb.where = append(qb.where, "id = :id")
+	qb.parameters["id"] = id
+	return qb
+}
+
 // Select sets the fields to select.
 func (qb *queryBuilder[T]) Select(fields ...string) *queryBuilder[T] {
 	qb.fields = strings.Join(fields, ", ")

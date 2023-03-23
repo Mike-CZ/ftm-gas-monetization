@@ -31,7 +31,7 @@ type TestChain struct {
 	AdminAcc           *testAccount
 	FunderAcc          *testAccount
 	ProjectsManagerAcc *testAccount
-	ProjectAcc         *testAccount
+	ProjectOwnerAcc    *testAccount
 	*rpc.Rpc
 	container testcontainers.Container
 }
@@ -56,7 +56,7 @@ func SetupTestChain(logger *logger.AppLogger) *TestChain {
 		AdminAcc:           initializeTestAccount("bb39aa88008bc6260ff9ebc816178c47a01c44efe55810ea1f271c00f5878812"),
 		FunderAcc:          initializeTestAccount("29c8b4ff78e41dafd561f5cd4a90103faf20a5b509a4b6281947b8fcdcfa8f71"),
 		ProjectsManagerAcc: initializeTestAccount("460503be96e3b97c2d6fb737bef83d89df42e4a36adef2e8fb4f0976b70d1b2a"),
-		ProjectAcc:         initializeTestAccount("1516a467486cd4340e5f0e8193eea05c9106bb0dce26a03047580c25c9191f93"),
+		ProjectOwnerAcc:    initializeTestAccount("1516a467486cd4340e5f0e8193eea05c9106bb0dce26a03047580c25c9191f93"),
 	}
 }
 
