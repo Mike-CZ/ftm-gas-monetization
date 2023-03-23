@@ -35,11 +35,14 @@ func (b *Big) Scan(value interface{}) error {
 			b.Big = hexutil.Big{}
 			return nil
 		}
-		d, err := hex.DecodeString(v)
+		if len(v) < 3 || v[:2] != "0x" {
+			v = "0x" + v
+		}
+		d, err := hexutil.DecodeBig(v)
 		if err != nil {
 			return err
 		}
-		b.Big = hexutil.Big(*new(big.Int).SetBytes(d))
+		b.Big = hexutil.Big(*d)
 	default:
 		return fmt.Errorf("unsupported bigint type %T", value)
 	}

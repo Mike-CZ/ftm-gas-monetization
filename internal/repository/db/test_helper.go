@@ -52,6 +52,16 @@ func SetupTestDatabase(logger *logger.AppLogger) *TestDatabase {
 	}
 }
 
+// Migrate runs the database migrations
+func (tdb *TestDatabase) Migrate() error {
+	return tdb.migrateTables()
+}
+
+// Drop drops all tables
+func (tdb *TestDatabase) Drop() error {
+	return tdb.dropTables()
+}
+
 // TearDown removes the test container and closes the database connection
 func (tdb *TestDatabase) TearDown() {
 	if err := tdb.Db.db.Close(); err != nil {

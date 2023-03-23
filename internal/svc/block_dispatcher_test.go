@@ -85,6 +85,8 @@ func (s *DispatcherTestSuite) SetupSuite() {
 
 // SetupTest sets up the test
 func (s *DispatcherTestSuite) SetupTest() {
+	err := s.testDb.Migrate()
+	assert.Nil(s.T(), err)
 	s.initializeSfc()
 	s.initializeSfcSession()
 	s.initializeGasMonetization()
@@ -92,6 +94,12 @@ func (s *DispatcherTestSuite) SetupTest() {
 	s.initializeGasMonetizationRoles()
 	// shift epoch by one by beginning of the test
 	s.shiftEpochs(s.currentEpoch + 1)
+}
+
+// TearDownTest tears down the test
+func (s *DispatcherTestSuite) TearDownTest() {
+	err := s.testDb.Drop()
+	assert.Nil(s.T(), err)
 }
 
 // TearDownSuite tears down the test suite

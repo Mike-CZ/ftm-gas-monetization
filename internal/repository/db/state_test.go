@@ -1,27 +1,61 @@
-package db_test
+package db
 
 import (
 	"context"
 	"github.com/stretchr/testify/assert"
-	"testing"
+	"math/big"
 )
 
-func TestLastProcessedBlock(t *testing.T) {
+func (s *DbTestSuite) TestLastProcessedBlock() {
 	// test setting last processed block
-	err := testDB.UpdateLastProcessedBlock(context.Background(), 500)
-	assert.Nil(t, err)
+	err := s.db.UpdateLastProcessedBlock(context.Background(), 500)
+	assert.Nil(s.T(), err)
 	// test getting last processed block
-	id, err := testDB.LastProcessedBlock(context.Background())
-	assert.Nil(t, err)
-	assert.EqualValues(t, 500, id)
+	id, err := s.db.LastProcessedBlock(context.Background())
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), 500, id)
 }
 
-func TestLastProcessedEpoch(t *testing.T) {
+func (s *DbTestSuite) TestLastProcessedEpoch() {
 	// test setting last processed epoch
-	err := testDB.UpdateLastProcessedEpoch(context.Background(), 11)
-	assert.Nil(t, err)
+	err := s.db.UpdateLastProcessedEpoch(context.Background(), 11)
+	assert.Nil(s.T(), err)
 	// test getting last processed epoch
-	id, err := testDB.LastProcessedEpoch(context.Background())
-	assert.Nil(t, err)
-	assert.EqualValues(t, 11, id)
+	id, err := s.db.LastProcessedEpoch(context.Background())
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), 11, id)
+}
+
+func (s *DbTestSuite) TestTotalAmountCollected() {
+	// test increasing total amount collected
+	err := s.db.IncreaseTotalAmountCollected(context.Background(), new(big.Int).SetUint64(100))
+	assert.Nil(s.T(), err)
+	// test getting total amount collected
+	amount, err := s.db.TotalAmountCollected(context.Background())
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), 100, amount.Uint64())
+	// increase amount again
+	err = s.db.IncreaseTotalAmountCollected(context.Background(), new(big.Int).SetUint64(50))
+	assert.Nil(s.T(), err)
+	// test getting total amount collected
+	amount, err = s.db.TotalAmountCollected(context.Background())
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), 150, amount.Uint64())
+}
+
+func (s *DbTestSuite) TestTotalAmountClaimed() {
+	// test increasing total amount claimed
+	err := s.db.IncreaseTotalAmountClaimed(context.Background(), new(big.Int).SetUint64(10))
+	assert.Nil(s.T(), err)
+	// test getting total amount claimed
+	amount, err := s.db.TotalAmountClaimed(context.Background())
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), 10, amount.Uint64())
+	// increase amount again
+	err = s.db.IncreaseTotalAmountClaimed(context.Background(), new(big.Int).SetUint64(5))
+	assert.Nil(s.T(), err)
+	// test getting total amount claimed
+	amount, err = s.db.TotalAmountClaimed(context.Background())
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), 15, amount.Uint64())
 }

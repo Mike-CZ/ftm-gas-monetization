@@ -1,4 +1,4 @@
-package db_test
+package db
 
 import (
 	"context"
@@ -6,16 +6,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/assert"
-	"testing"
 	"time"
 )
 
-func TestStoreTransaction(t *testing.T) {
+func (s *DbTestSuite) TestStoreTransaction() {
 	blockNumber := hexutil.Uint64(57190053)
 	gasUsed := hexutil.Uint64(21000)
 	big, _ := hexutil.DecodeBig("0x75bcd15")
 	gasPrice := types.Big{Big: hexutil.Big(*big)}
-	err := testDB.StoreTransaction(context.Background(), &types.Transaction{
+	err := s.db.StoreTransaction(context.Background(), &types.Transaction{
 		Hash:        &types.Hash{Hash: common.HexToHash("0x48b50bc6f9679c37a283b308ec4cdcf14a43d818fa43e6dcbe8d9c7d28331096")},
 		BlockHash:   &types.Hash{Hash: common.HexToHash("0x0002fcf20000016fb9f7ffabf8757b0d3f5f36e86bebbd09f1a03d8d4c4ae306")},
 		BlockNumber: &blockNumber,
@@ -26,5 +25,5 @@ func TestStoreTransaction(t *testing.T) {
 		GasUsed:     &gasUsed,
 		GasPrice:    &gasPrice,
 	})
-	assert.Nil(t, err)
+	assert.Nil(s.T(), err)
 }

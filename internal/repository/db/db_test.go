@@ -1,67 +1,85 @@
-package db_test
+package db
 
 import (
 	"context"
 	"fmt"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/db"
 	"github.com/op/go-logging"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 	"log"
-	"os"
 	"testing"
 )
 
-var testDB *db.TestDatabase
-
-func TestMain(m *testing.M) {
-	testDB = db.SetupTestDatabase(logger.New(log.Writer(), "test", logging.ERROR))
-	defer testDB.TearDown()
-	os.Exit(m.Run())
+type DbTestSuite struct {
+	suite.Suite
+	db *TestDatabase
 }
 
-func TestDatabaseTransaction(t *testing.T) {
+func TestDbTestSuite(t *testing.T) {
+	suite.Run(t, new(DbTestSuite))
+}
+
+func (s *DbTestSuite) SetupSuite() {
+	s.db = SetupTestDatabase(logger.New(log.Writer(), "test", logging.ERROR))
+}
+
+func (s *DbTestSuite) SetupTest() {
+	err := s.db.Migrate()
+	assert.Nil(s.T(), err)
+}
+
+func (s *DbTestSuite) TearDownTest() {
+	err := s.db.Drop()
+	assert.Nil(s.T(), err)
+}
+
+func (s *DbTestSuite) TearDownSuite() {
+	s.db.TearDown()
+}
+
+func (s *DbTestSuite) TestDatabaseTransaction() {
 	// test update block and epoch
-	err := testDB.DatabaseTransaction(context.Background(), func(ctx context.Context, db *db.Db) error {
-		err := db.UpdateLastProcessedBlock(ctx, 1)
-		assert.Nil(t, err)
-		err = db.UpdateLastProcessedEpoch(ctx, 2)
-		assert.Nil(t, err)
+	err := s.db.DatabaseTransaction(context.Background(), func(ctx context.Context, db *Db) error {
+		err := s.db.UpdateLastProcessedBlock(ctx, 1)
+		assert.Nil(s.T(), err)
+		err = s.db.UpdateLastProcessedEpoch(ctx, 2)
+		assert.Nil(s.T(), err)
 		return nil
 	})
-	assert.Nil(t, err)
+	assert.Nil(s.T(), err)
 
 	// assert values changed
-	block, err := testDB.LastProcessedBlock(context.Background())
-	assert.Nil(t, err)
-	assert.EqualValues(t, 1, block)
-	epoch, err := testDB.LastProcessedEpoch(context.Background())
-	assert.Nil(t, err)
-	assert.EqualValues(t, 2, epoch)
+	block, err := s.db.LastProcessedBlock(context.Background())
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), 1, block)
+	epoch, err := s.db.LastProcessedEpoch(context.Background())
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), 2, epoch)
 }
 
-func TestDatabaseTransactionRollback(t *testing.T) {
+func (s *DbTestSuite) TestDatabaseTransactionRollback() {
 	// set values
-	err := testDB.UpdateLastProcessedBlock(context.Background(), 5)
-	assert.Nil(t, err)
-	err = testDB.UpdateLastProcessedEpoch(context.Background(), 6)
-	assert.Nil(t, err)
+	err := s.db.UpdateLastProcessedBlock(context.Background(), 5)
+	assert.Nil(s.T(), err)
+	err = s.db.UpdateLastProcessedEpoch(context.Background(), 6)
+	assert.Nil(s.T(), err)
 
 	// test update block and epoch and then rollback changes by returning error
-	err = testDB.DatabaseTransaction(context.Background(), func(ctx context.Context, db *db.Db) error {
+	err = s.db.DatabaseTransaction(context.Background(), func(ctx context.Context, db *Db) error {
 		err := db.UpdateLastProcessedBlock(ctx, 1)
-		assert.Nil(t, err)
+		assert.Nil(s.T(), err)
 		err = db.UpdateLastProcessedEpoch(ctx, 2)
-		assert.Nil(t, err)
+		assert.Nil(s.T(), err)
 		return fmt.Errorf("test error")
 	})
-	assert.NotNil(t, err)
+	assert.NotNil(s.T(), err)
 
 	// assert values has not changed
-	block, err := testDB.LastProcessedBlock(context.Background())
-	assert.Nil(t, err)
-	assert.EqualValues(t, 5, block)
-	epoch, err := testDB.LastProcessedEpoch(context.Background())
-	assert.Nil(t, err)
-	assert.EqualValues(t, 6, epoch)
+	block, err := s.db.LastProcessedBlock(context.Background())
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), 5, block)
+	epoch, err := s.db.LastProcessedEpoch(context.Background())
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), 6, epoch)
 }
