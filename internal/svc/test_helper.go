@@ -19,6 +19,7 @@ import (
 const (
 	TestChainId       = 1337
 	TestChainGasLimit = 10000000000
+	TestChainGasPrice = 6721975
 )
 
 type testAccount struct {

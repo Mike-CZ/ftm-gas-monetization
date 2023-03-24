@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 type ProjectContractQueryBuilder struct {
@@ -18,9 +19,23 @@ func (db *Db) ProjectContractQuery(ctx context.Context) ProjectContractQueryBuil
 }
 
 // WhereProjectId adds a where clause to the query builder.
-func (qb *ProjectContractQueryBuilder) WhereProjectId(projectId uint64) *ProjectContractQueryBuilder {
+func (qb *ProjectContractQueryBuilder) WhereProjectId(projectId int64) *ProjectContractQueryBuilder {
 	qb.where = append(qb.where, "project_id = :project_id")
 	qb.parameters["project_id"] = projectId
+	return qb
+}
+
+// WhereProjectIdIn adds a where clause to the query builder.
+func (qb *ProjectContractQueryBuilder) WhereProjectIdIn(ids []int64) *ProjectContractQueryBuilder {
+	qb.where = append(qb.where, "project_id = ANY(:project_ids)")
+	qb.parameters["project_ids"] = pq.Array(ids)
+	return qb
+}
+
+// WhereIsEnabled adds a where clause to the query builder.
+func (qb *ProjectContractQueryBuilder) WhereIsEnabled(isEnabled bool) *ProjectContractQueryBuilder {
+	qb.where = append(qb.where, "is_enabled = :is_enabled")
+	qb.parameters["is_enabled"] = isEnabled
 	return qb
 }
 

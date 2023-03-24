@@ -32,6 +32,13 @@ func (qb *ProjectQueryBuilder) WhereOwner(owner *types.Address) *ProjectQueryBui
 	return qb
 }
 
+// WhereActiveInEpoch adds a where clause to the query builder.
+func (qb *ProjectQueryBuilder) WhereActiveInEpoch(epoch uint64) *ProjectQueryBuilder {
+	qb.where = append(qb.where, "active_from_epoch <= :epoch AND (active_to_epoch IS NULL OR active_to_epoch > :epoch)")
+	qb.parameters["epoch"] = epoch
+	return qb
+}
+
 // StoreProject stores the project in the database.
 func (db *Db) StoreProject(ctx context.Context, project *types.Project) error {
 	query := `INSERT INTO project (owner_address, project_id, receiver_address, last_withdrawal_epoch, active_from_epoch, active_to_epoch) 

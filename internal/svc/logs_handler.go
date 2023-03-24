@@ -61,12 +61,14 @@ func (bld *blkDispatcher) handleProjectAdded(ctx context.Context, log *eth.Log, 
 	for _, contract := range eventData["contracts"].([]common.Address) {
 		addr := types.Address{Address: contract}
 		if err := transaction.StoreProjectContract(ctx, &types.ProjectContract{
-			ProjectId: uint64(project.Id),
+			ProjectId: project.Id,
 			Address:   &addr,
 			Enabled:   true,
 		}); err != nil {
 			return fmt.Errorf("failed to add contract %s for project #%d: %v", contract.Hex(), project.ProjectId, err)
 		}
+		// add contract to watched contracts
+		bld.watchedContracts[contract] = project.Id
 	}
 	return nil
 }
@@ -95,6 +97,15 @@ func (bld *blkDispatcher) handleProjectSuspended(ctx context.Context, log *eth.L
 	if err != nil {
 		return fmt.Errorf("failed to suspend project #%d: %v", project.ProjectId, err)
 	}
+	// remove contracts from watched contracts
+	pcq := transaction.ProjectContractQuery(ctx)
+	contracts, err := pcq.WhereProjectId(project.Id).WhereIsEnabled(true).GetAll()
+	if err != nil {
+		return fmt.Errorf("failed to get contracts for project #%d: %v", project.ProjectId, err)
+	}
+	for _, contract := range contracts {
+		delete(bld.watchedContracts, contract.Address.Address)
+	}
 	return nil
 }
 
@@ -122,6 +133,15 @@ func (bld *blkDispatcher) handleProjectEnabled(ctx context.Context, log *eth.Log
 	if err != nil {
 		return fmt.Errorf("failed to enable project #%d: %v", project.ProjectId, err)
 	}
+	// add contracts into watched contracts
+	pcq := transaction.ProjectContractQuery(ctx)
+	contracts, err := pcq.WhereProjectId(project.Id).WhereIsEnabled(true).GetAll()
+	if err != nil {
+		return fmt.Errorf("failed to get contracts for project #%d: %v", project.ProjectId, err)
+	}
+	for _, contract := range contracts {
+		bld.watchedContracts[contract.Address.Address] = project.Id
+	}
 	return nil
 }
 
@@ -145,12 +165,14 @@ func (bld *blkDispatcher) handleProjectContractAdded(ctx context.Context, log *e
 	// add contract
 	addr := types.Address{Address: common.BytesToAddress(log.Topics[2].Bytes())}
 	if err := transaction.StoreProjectContract(ctx, &types.ProjectContract{
-		ProjectId: uint64(project.Id),
+		ProjectId: project.Id,
 		Address:   &addr,
 		Enabled:   true,
 	}); err != nil {
 		return fmt.Errorf("failed to add contract %s for project #%d: %v", addr.Hex(), project.ProjectId, err)
 	}
+	// add contract into watched contracts
+	bld.watchedContracts[addr.Address] = project.Id
 
 	return nil
 }
@@ -172,6 +194,8 @@ func (bld *blkDispatcher) handleProjectContractRemoved(ctx context.Context, log 
 	if err := qb.WhereAddress(&addr).Delete(); err != nil {
 		return fmt.Errorf("failed to delete contract %s for project #%d: %v", addr.Hex(), log.Topics[1].Big().Uint64(), err)
 	}
+	// remove contract from watched contracts
+	delete(bld.watchedContracts, addr.Address)
 	return nil
 }
 

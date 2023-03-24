@@ -9,6 +9,10 @@ import (
 
 // Transaction represents basic information provided by the API about transaction inside Opera blockchain.
 type Transaction struct {
+	Id int64 `db:"id"`
+	// ProjectId represents the project ID this transaction belongs to.
+	ProjectId int64 `db:"project_id"`
+
 	// Hash represents 32 bytes hash of the transaction.
 	Hash *Hash `json:"hash" db:"hash"`
 
@@ -27,10 +31,7 @@ type Transaction struct {
 	// To represents the address of the receiver. nil when it's a contract creation transaction.
 	To *Address `json:"to,omitempty" db:"to_address"`
 
-	// Gas represents gas provided by the sender.
-	Gas hexutil.Uint64 `json:"gas" db:"gas_limit"`
-
-	// Gas represents gas provided by the sender.
+	// GasUsed represents the amount of gas used by this specific transaction alone.
 	GasUsed *hexutil.Uint64 `json:"gasUsed" db:"gas_used"`
 
 	// GasPrice represents gas price provided by the sender in Wei.

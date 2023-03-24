@@ -1,15 +1,18 @@
 package svc
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/db"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/rpc/contracts"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
+	"github.com/Mike-CZ/ftm-gas-monetization/internal/utils"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	eth "github.com/ethereum/go-ethereum/core/types"
 	"github.com/op/go-logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -132,7 +135,7 @@ func (s *DispatcherTestSuite) TestAddProject() {
 	assert.Nil(s.T(), project.ActiveToEpoch)
 	// assert contracts were added
 	pcq := s.testRepo.ProjectContractQuery()
-	pcl, err := pcq.WhereProjectId(project.ProjectId).GetAll()
+	pcl, err := pcq.WhereProjectId(project.Id).GetAll()
 	assert.Nil(s.T(), err)
 	assert.Len(s.T(), projectContracts, 2)
 	for i, pc := range pcl {
@@ -305,6 +308,29 @@ func (s *DispatcherTestSuite) TestWithdrawalRequest() {
 	assert.EqualValues(s.T(), s.currentEpoch, wr.Epoch)
 }
 
+// TestUpdateOwner tests the update owner functionality
+func (s *DispatcherTestSuite) TestCollectRelatedTransactions() {
+	s.setupTestProject()
+	s.shiftEpochs(100)
+	// send 10 related transactions
+	for i := 0; i < 10; i++ {
+		s.sendTransaction(s.testChain.FunderAcc, projectContracts[0].Address, big.NewInt(1_000))
+		s.processBlock(s.getLatestBlock())
+	}
+	tq := s.testRepo.TransactionQuery()
+	transactions, err := tq.GetAll()
+	assert.Nil(s.T(), err)
+	assert.Len(s.T(), transactions, 10)
+	// send 10 unrelated transactions
+	for i := 0; i < 10; i++ {
+		s.sendTransaction(s.testChain.FunderAcc, s.testChain.ProjectOwnerAcc.Address, big.NewInt(1_000))
+		s.processBlock(s.getLatestBlock())
+	}
+	transactions, err = tq.GetAll()
+	assert.Nil(s.T(), err)
+	assert.Len(s.T(), transactions, 10)
+}
+
 // initializeSfc deploys the sfc mock contract to the test chain
 func (s *DispatcherTestSuite) initializeSfc() {
 	auth, err := bind.NewKeyedTransactorWithChainID(s.testChain.AdminAcc.PrivateKey, big.NewInt(TestChainId))
@@ -331,47 +357,22 @@ func (s *DispatcherTestSuite) initializeGasMonetization() {
 	s.gasMonetizationAddr = address
 }
 
-//
-//func TestLastProcessedBlock(t *testing.T) {
-//	privateKey, err := crypto.HexToECDSA("bb39aa88008bc6260ff9ebc816178c47a01c44efe55810ea1f271c00f5878812")
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	publicKey := privateKey.Public()
-//	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
-//	if !ok {
-//		log.Fatal("error casting public key to ECDSA")
-//	}
-//	fromAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
-//	nonce, err := testChain.RawRpc.PendingNonceAt(context.Background(), fromAddress)
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	value := big.NewInt(1000000000000000000)
-//	gasLimit := uint64(21000)
-//	gasPrice := big.NewInt(6721975)
-//	toAddress := common.HexToAddress(svc.TestAccount2)
-//	tx := types.NewTransaction(nonce, toAddress, value, gasLimit, gasPrice, nil)
-//	chainID, err := testChain.RawRpc.NetworkID(context.Background())
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), privateKey)
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	err = testChain.RawRpc.SendTransaction(context.Background(), signedTx)
-//	if err != nil {
-//		log.Fatal(err)
-//	}
-//	t.Logf("tx sent: %s", signedTx.Hash().Hex())
-//
-//	blockHeigh, err := testChain.BlockHeight()
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//	t.Logf("block height: %s", blockHeigh.String())
-//}
+// sendTransaction sends a transaction from the given account to the given address
+func (s *DispatcherTestSuite) sendTransaction(from *testAccount, to common.Address, value *big.Int) {
+	nonce, err := s.testChain.RawRpc.PendingNonceAt(context.Background(), from.Address)
+	assert.Nil(s.T(), err)
+	tx := eth.NewTx(&eth.LegacyTx{
+		Nonce:    nonce,
+		GasPrice: big.NewInt(TestChainGasPrice),
+		Gas:      TestChainGasLimit,
+		To:       &to,
+		Value:    value,
+	})
+	signedTx, err := eth.SignTx(tx, eth.NewEIP155Signer(big.NewInt(TestChainId)), from.PrivateKey)
+	assert.Nil(s.T(), err)
+	err = s.testChain.RawRpc.SendTransaction(context.Background(), signedTx)
+	assert.Nil(s.T(), err)
+}
 
 // initializeGasMonetizationSessions initializes sessions for the test accounts
 func (s *DispatcherTestSuite) initializeGasMonetizationSessions() {
@@ -414,13 +415,6 @@ func initializeGasMonetizationSession(
 	}
 }
 
-// getCurrentBlockId returns the current block id
-func (s *DispatcherTestSuite) getCurrentBlockId() *big.Int {
-	block, err := s.testChain.BlockHeight()
-	assert.Nil(s.T(), err)
-	return block.ToInt()
-}
-
 // initializeGasMonetizationRoles assigns roles to the test accounts
 func (s *DispatcherTestSuite) initializeGasMonetizationRoles() {
 	funderRole, err := s.gasMonetization.FUNDERROLE(nil)
@@ -440,17 +434,6 @@ func (s *DispatcherTestSuite) shiftEpochs(epochs uint64) {
 	assert.Nil(s.T(), err)
 }
 
-// addProject adds a project to gas monetization contract
-func (s *DispatcherTestSuite) addProject(
-	owner common.Address,
-	recipient common.Address,
-	metadataUri string,
-	contracts []common.Address,
-) {
-	_, err := s.projectsManagerSession.AddProject(owner, recipient, metadataUri, contracts)
-	assert.Nil(s.T(), err)
-}
-
 // fundContract funds the gas monetization contract
 func (s *DispatcherTestSuite) fundContract(amount *big.Int) {
 	// set amount to send
@@ -463,11 +446,10 @@ func (s *DispatcherTestSuite) fundContract(amount *big.Int) {
 
 // addProject adds a project to gas monetization contract
 func (s *DispatcherTestSuite) setupTestProject() {
-	var contractAddresses []common.Address
-	for _, addr := range projectContracts {
-		contractAddresses = append(contractAddresses, addr.Address)
-	}
-	s.addProject(projectOwner.Address, projectRecipient.Address, projectUri, contractAddresses)
+	contractAddresses := utils.Map(projectContracts, func(c *types.Address) common.Address { return c.Address })
+	_, err := s.projectsManagerSession.AddProject(
+		projectOwner.Address, projectRecipient.Address, projectUri, contractAddresses)
+	assert.Nil(s.T(), err)
 	// process the latest block
 	s.processBlock(s.getLatestBlock())
 }
