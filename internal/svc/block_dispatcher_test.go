@@ -90,6 +90,7 @@ func (s *DispatcherTestSuite) SetupSuite() {
 func (s *DispatcherTestSuite) SetupTest() {
 	err := s.testDb.Migrate()
 	assert.Nil(s.T(), err)
+	s.blkDispatcher.init()
 	s.initializeSfc()
 	s.initializeSfcSession()
 	s.initializeGasMonetization()
@@ -140,7 +141,7 @@ func (s *DispatcherTestSuite) TestAddProject() {
 	assert.Len(s.T(), projectContracts, 2)
 	for i, pc := range pcl {
 		assert.EqualValues(s.T(), project.Id, pc.ProjectId)
-		assert.True(s.T(), pc.Enabled)
+		assert.True(s.T(), pc.Approved)
 		assert.EqualValues(s.T(), projectContracts[i].Address.Hex(), pc.Address.Hex())
 	}
 }
@@ -200,7 +201,7 @@ func (s *DispatcherTestSuite) TestAddContract() {
 	assert.Nil(s.T(), err)
 	assert.EqualValues(s.T(), project.Id, c.ProjectId)
 	assert.EqualValues(s.T(), contractAddr.Hex(), c.Address.Hex())
-	assert.True(s.T(), c.Enabled)
+	assert.True(s.T(), c.Approved)
 }
 
 // TestAddContract tests the remove contract functionality
@@ -288,7 +289,6 @@ func (s *DispatcherTestSuite) TestUpdateOwner() {
 // TestUpdateOwner tests the update owner functionality
 func (s *DispatcherTestSuite) TestWithdrawalRequest() {
 	s.setupTestProject()
-	s.shiftEpochs(100)
 	// fund the contract
 	s.fundContract(new(big.Int).SetUint64(5_000))
 	// request withdrawal
@@ -311,7 +311,6 @@ func (s *DispatcherTestSuite) TestWithdrawalRequest() {
 // TestUpdateOwner tests the update owner functionality
 func (s *DispatcherTestSuite) TestCollectRelatedTransactions() {
 	s.setupTestProject()
-	s.shiftEpochs(100)
 	// send 10 related transactions
 	for i := 0; i < 10; i++ {
 		s.sendTransaction(s.testChain.FunderAcc, projectContracts[0].Address, big.NewInt(1_000))
@@ -329,6 +328,116 @@ func (s *DispatcherTestSuite) TestCollectRelatedTransactions() {
 	transactions, err = tq.GetAll()
 	assert.Nil(s.T(), err)
 	assert.Len(s.T(), transactions, 10)
+}
+
+// TestAddingContractWillCollectTransactions tests that adding a contract will collect transactions
+func (s *DispatcherTestSuite) TestAddingContractWillCollectTransactions() {
+	s.setupTestProject()
+	addr := common.HexToAddress("0x91567C6F4B31cd51dFE6ADE09579d43240187FF1")
+	// send 10 transactions
+	for i := 0; i < 10; i++ {
+		s.sendTransaction(s.testChain.FunderAcc, addr, big.NewInt(1_000))
+		s.processBlock(s.getLatestBlock())
+	}
+	// verify that no transactions were collected
+	tq := s.testRepo.TransactionQuery()
+	transactions, err := tq.GetAll()
+	assert.Nil(s.T(), err)
+	assert.Len(s.T(), transactions, 0)
+	// add new contract
+	_, err = s.projectsManagerSession.AddProjectContract(new(big.Int).SetUint64(1), addr)
+	assert.Nil(s.T(), err)
+	s.processBlock(s.getLatestBlock())
+	// send 10 transactions
+	for i := 0; i < 10; i++ {
+		s.sendTransaction(s.testChain.FunderAcc, addr, big.NewInt(1_000))
+		s.processBlock(s.getLatestBlock())
+	}
+	// verify that transactions were collected
+	transactions, err = tq.GetAll()
+	assert.Nil(s.T(), err)
+	assert.Len(s.T(), transactions, 10)
+}
+
+// TestAddingContractForSuspendedProjectWontCollectTransactions tests that adding a contract for a suspended
+// project won't collect transactions
+func (s *DispatcherTestSuite) TestAddingContractForSuspendedProjectWontCollectTransactions() {
+	s.setupTestProject()
+	// suspend project
+	_, err := s.projectsManagerSession.SuspendProject(new(big.Int).SetUint64(1))
+	assert.Nil(s.T(), err)
+	s.processBlock(s.getLatestBlock())
+	// add new contract
+	addr := common.HexToAddress("0x91567C6F4B31cd51dFE6ADE09579d43240187FF1")
+	_, err = s.projectsManagerSession.AddProjectContract(new(big.Int).SetUint64(1), addr)
+	assert.Nil(s.T(), err)
+	s.processBlock(s.getLatestBlock())
+	// send 10 transactions
+	for i := 0; i < 10; i++ {
+		s.sendTransaction(s.testChain.FunderAcc, addr, big.NewInt(1_000))
+		s.processBlock(s.getLatestBlock())
+	}
+	// verify that no transactions were collected
+	tq := s.testRepo.TransactionQuery()
+	transactions, err := tq.GetAll()
+	assert.Nil(s.T(), err)
+	assert.Len(s.T(), transactions, 0)
+	// enable project
+	_, err = s.projectsManagerSession.EnableProject(new(big.Int).SetUint64(1))
+	assert.Nil(s.T(), err)
+	s.processBlock(s.getLatestBlock())
+	// send 10 transactions
+	for i := 0; i < 10; i++ {
+		s.sendTransaction(s.testChain.FunderAcc, addr, big.NewInt(1_000))
+		s.processBlock(s.getLatestBlock())
+	}
+	// verify that transactions were collected
+	transactions, err = tq.GetAll()
+	assert.Nil(s.T(), err)
+	assert.Len(s.T(), transactions, 10)
+}
+
+// TestAddingContractWillCollectTransactions tests that adding a contract will collect transactions
+func (s *DispatcherTestSuite) TestDeletingContractWontCollectTransactions() {
+	s.setupTestProject()
+	// send 10 transactions
+	for i := 0; i < 10; i++ {
+		s.sendTransaction(s.testChain.FunderAcc, projectContracts[0].Address, big.NewInt(1_000))
+		s.processBlock(s.getLatestBlock())
+	}
+	// verify that transactions were collected
+	tq := s.testRepo.TransactionQuery()
+	transactions, err := tq.GetAll()
+	assert.Nil(s.T(), err)
+	assert.Len(s.T(), transactions, 10)
+	// remove contract
+	_, err = s.projectsManagerSession.RemoveProjectContract(new(big.Int).SetUint64(1), projectContracts[0].Address)
+	assert.Nil(s.T(), err)
+	s.processBlock(s.getLatestBlock())
+	// send 10 transactions
+	for i := 0; i < 10; i++ {
+		s.sendTransaction(s.testChain.FunderAcc, projectContracts[0].Address, big.NewInt(1_000))
+		s.processBlock(s.getLatestBlock())
+	}
+	// verify that no transactions were collected
+	transactions, err = tq.GetAll()
+	assert.Nil(s.T(), err)
+	assert.Len(s.T(), transactions, 10)
+}
+
+// TestAmountToWithdrawIsCalculatedCorrectly tests that amount to withdraw is calculated correctly
+func (s *DispatcherTestSuite) TestAmountToWithdrawIsCalculatedCorrectly() {
+	s.setupTestProject()
+	s.sendTransaction(s.testChain.FunderAcc, projectContracts[0].Address, big.NewInt(1_000))
+	s.processBlock(s.getLatestBlock())
+	tq := s.testRepo.TransactionQuery()
+	transaction, err := tq.GetFirst()
+	assert.Nil(s.T(), err)
+	// calculate expected amount
+	a := new(big.Int).Mul(new(big.Int).SetUint64(TestChainGasPrice), new(big.Int).SetUint64(uint64(*transaction.GasUsed)))
+	b := new(big.Int).Mul(a, big.NewInt(rewardsPercentage))
+	expectedAmount := new(big.Int).Div(b, big.NewInt(100))
+	assert.EqualValues(s.T(), expectedAmount, transaction.RewardToClaim.ToInt())
 }
 
 // initializeSfc deploys the sfc mock contract to the test chain

@@ -6,10 +6,14 @@ import (
 	"fmt"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/db"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/utils"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"math/big"
 	"time"
 )
+
+// rewardPercentage represents the percentage of the reward to be paid to the project.
+const rewardsPercentage = 15
 
 // blkDispatcher implements a service responsible for processing new blocks on the blockchain.
 type blkDispatcher struct {
@@ -18,8 +22,10 @@ type blkDispatcher struct {
 	outDispatched chan uint64
 	// topics represents a map of topics to their respective event handlers.
 	topics map[common.Hash]EventHandler
-	// watchedContracts represents a map of contracts to their respective project IDs.
-	watchedContracts map[common.Address]int64
+	// watchedContracts represents a map of contracts to their respective project instances.
+	watchedContracts map[common.Address]*types.Project
+	// watchedProjectIds represents a map of projects where key is `project_id` provided by contract.
+	watchedProjectIds map[uint64]*types.Project
 	// latestProcessedEpochId represents the latest epoch id.
 	latestProcessedEpochId uint64
 }
@@ -34,8 +40,7 @@ func (bld *blkDispatcher) init() {
 	bld.sigStop = make(chan struct{})
 	bld.outDispatched = make(chan uint64, blsBlockBufferCapacity)
 	bld.initializeTopics()
-	bld.initializeLastEpoch()
-	bld.initializeProjects()
+	bld.initializeTrackedData()
 }
 
 // run starts the block dispatcher
@@ -101,9 +106,6 @@ func (bld *blkDispatcher) processTxs(blk *types.Block) bool {
 		bld.log.Debugf("empty block #%d processed", blk.Number)
 		return true
 	}
-	// make backup of the contract list in case we need to rollback
-	backupWatchedContracts := utils.CopyMap(bld.watchedContracts)
-
 	// process all blockchain transactions in database transaction
 	// to ensure all transactions are processed or none
 	err := bld.repo.DatabaseTransaction(func(ctx context.Context, db *db.Db) error {
@@ -112,7 +114,20 @@ func (bld *blkDispatcher) processTxs(blk *types.Block) bool {
 			if trx == nil {
 				return fmt.Errorf("failed to load transaction %s", th.String())
 			}
-			if bld.checkContractAndFillTransaction(trx) {
+			// update last processed epoch id, so we can continue from here
+			if uint64(blk.Epoch) > (bld.latestProcessedEpochId + 1) {
+				// we subtract 1 because current epoch is not yet finished
+				bld.latestProcessedEpochId = uint64(blk.Epoch) - 1
+				if err := db.UpdateLastProcessedEpoch(ctx, bld.latestProcessedEpochId); err != nil {
+					return err
+				}
+			}
+			if bld.checkContractAndFillProjectId(trx) {
+				total := new(big.Int).Mul(trx.GasPrice.ToInt(), new(big.Int).SetUint64(uint64(*trx.GasUsed)))
+				reward := new(big.Int).Mul(total, big.NewInt(rewardsPercentage))
+				finalReward := new(big.Int).Div(reward, big.NewInt(100))
+				trx.RewardToClaim = &types.Big{Big: hexutil.Big(*finalReward)}
+				//trx.RewardToClaim
 				if err := db.StoreTransaction(ctx, trx); err != nil {
 					return err
 				}
@@ -139,21 +154,21 @@ func (bld *blkDispatcher) processTxs(blk *types.Block) bool {
 	})
 	if err != nil {
 		bld.log.Errorf("failed to process transactions; %s", err.Error())
-		// restore the contract list
-		bld.watchedContracts = backupWatchedContracts
+		// reinitialize the data, because we might have a corrupted state
+		bld.initializeTrackedData()
 		return false
 	}
 	return true
 }
 
-// checkContractAndFillTransaction checks if the transaction is related to a contract and fills the project id.
-func (bld *blkDispatcher) checkContractAndFillTransaction(trx *types.Transaction) bool {
-	if trx.From != nil && bld.watchedContracts[trx.From.Address] > 0 {
-		trx.ProjectId = bld.watchedContracts[trx.From.Address]
+// checkContractAndFillProjectId checks if the transaction is related to a contract and fills the project id.
+func (bld *blkDispatcher) checkContractAndFillProjectId(trx *types.Transaction) bool {
+	if trx.From != nil && bld.watchedContracts[trx.From.Address] != nil {
+		trx.ProjectId = bld.watchedContracts[trx.From.Address].Id
 		return true
 	}
-	if trx.To != nil && bld.watchedContracts[trx.To.Address] > 0 {
-		trx.ProjectId = bld.watchedContracts[trx.To.Address]
+	if trx.To != nil && bld.watchedContracts[trx.To.Address] != nil {
+		trx.ProjectId = bld.watchedContracts[trx.To.Address].Id
 		return true
 	}
 	return false
@@ -172,29 +187,6 @@ func (bld *blkDispatcher) load(blk *types.Block, th *common.Hash) *types.Transac
 	return trx
 }
 
-// initializeProjects initializes the list of watched contracts.
-func (bld *blkDispatcher) initializeProjects() {
-	bld.watchedContracts = make(map[common.Address]int64)
-	// get all active projects
-	pq := bld.repo.ProjectQuery()
-	projects, err := pq.GetAll()
-	if err != nil {
-		bld.log.Fatal("failed to get active projects: %v", err)
-	}
-	// get slice of project ids
-	ids := utils.Map(projects, func(p *types.Project) int64 { return p.Id })
-	// get all enabled contracts for the active projects
-	pcq := bld.repo.ProjectContractQuery()
-	contracts, err := pcq.WhereIsEnabled(true).WhereProjectIdIn(ids).GetAll()
-	if err != nil {
-		bld.log.Fatal("failed to get project contracts: %v", err)
-	}
-	// initialize the map
-	for _, c := range contracts {
-		bld.watchedContracts[c.Address.Address] = c.ProjectId
-	}
-}
-
 // initializeLastEpoch initializes the last processed epoch.
 func (bld *blkDispatcher) initializeLastEpoch() {
 	epoch, err := bld.repo.LastProcessedEpoch()
@@ -202,4 +194,36 @@ func (bld *blkDispatcher) initializeLastEpoch() {
 		bld.log.Fatal("failed to get last processed epoch: %v", err)
 	}
 	bld.latestProcessedEpochId = epoch
+}
+
+// initializeProjects initializes the list of watched projects.
+func (bld *blkDispatcher) initializeProjects() {
+	bld.watchedContracts = make(map[common.Address]*types.Project)
+	bld.watchedProjectIds = make(map[uint64]*types.Project)
+	// get all active projects
+	pq := bld.repo.ProjectQuery()
+	// increase the epoch id by 1, because we want to get the projects that are active in the next epoch
+	// because we won't process already finished epochs
+	projects, err := pq.WhereActiveInEpoch(bld.latestProcessedEpochId + 1).GetAll()
+	if err != nil {
+		bld.log.Fatal("failed to get active projects: %v", err)
+	}
+	for _, project := range projects {
+		pcq := bld.repo.ProjectContractQuery()
+		contracts, err := pcq.WhereIsApproved(true).WhereProjectId(project.Id).GetAll()
+		if err != nil {
+			bld.log.Fatal("failed to get project contracts: %v", err)
+		}
+		for _, c := range contracts {
+			// store reference to the project for fast lookups
+			bld.watchedContracts[c.Address.Address] = &project
+			bld.watchedProjectIds[project.ProjectId] = &project
+		}
+	}
+}
+
+// initializeTrackedData initializes the data tracked by the block dispatcher.
+func (bld *blkDispatcher) initializeTrackedData() {
+	bld.initializeLastEpoch()
+	bld.initializeProjects()
 }

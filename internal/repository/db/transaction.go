@@ -19,8 +19,8 @@ func (db *Db) TransactionQuery(ctx context.Context) TransactionQueryBuilder {
 
 // StoreTransaction stores a transaction reference in connected persistent storage.
 func (db *Db) StoreTransaction(ctx context.Context, trx *types.Transaction) error {
-	query := `INSERT INTO transaction (project_id, hash, block_hash, block_number, timestamp, from_address, to_address, gas_used, gas_price) 
-		VALUES (:project_id, :hash, :block_hash, :block_number, :timestamp, :from_address, :to_address, :gas_used, :gas_price)`
+	query := `INSERT INTO transaction (project_id, hash, block_hash, block_number, timestamp, from_address, to_address, gas_used, gas_price, reward_to_claim) 
+		VALUES (:project_id, :hash, :block_hash, :block_number, :timestamp, :from_address, :to_address, :gas_used, :gas_price, :reward_to_claim)`
 
 	_, err := sqlx.NamedExecContext(ctx, db.con, query, trx)
 	if err != nil {

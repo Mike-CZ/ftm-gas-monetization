@@ -63,13 +63,15 @@ func (bld *blkDispatcher) handleProjectAdded(ctx context.Context, log *eth.Log, 
 		if err := transaction.StoreProjectContract(ctx, &types.ProjectContract{
 			ProjectId: project.Id,
 			Address:   &addr,
-			Enabled:   true,
+			Approved:  true,
 		}); err != nil {
 			return fmt.Errorf("failed to add contract %s for project #%d: %v", contract.Hex(), project.ProjectId, err)
 		}
 		// add contract to watched contracts
-		bld.watchedContracts[contract] = project.Id
+		bld.watchedContracts[contract] = project
 	}
+	// add project to watched projects
+	bld.watchedProjectIds[project.ProjectId] = project
 	return nil
 }
 
@@ -84,11 +86,10 @@ func (bld *blkDispatcher) handleProjectSuspended(ctx context.Context, log *eth.L
 	if err != nil {
 		return fmt.Errorf("failed to unpack ProjectSuspended event #%d/#%d: %v", log.BlockNumber, log.Index, err)
 	}
-	// fetch project
-	pq := transaction.ProjectQuery(ctx)
-	project, err := pq.WhereProjectId(log.Topics[1].Big().Uint64()).GetFirstOrFail()
-	if err != nil {
-		return fmt.Errorf("failed to get project #%d: %v", log.Topics[1].Big().Uint64(), err)
+	// get project from map
+	project := bld.watchedProjectIds[log.Topics[1].Big().Uint64()]
+	if project == nil {
+		return fmt.Errorf("project #%d is not watched", log.Topics[1].Big().Uint64())
 	}
 	// suspend project
 	activeTo := eventData["suspendedOnEpochNumber"].(*big.Int).Uint64()
@@ -99,13 +100,15 @@ func (bld *blkDispatcher) handleProjectSuspended(ctx context.Context, log *eth.L
 	}
 	// remove contracts from watched contracts
 	pcq := transaction.ProjectContractQuery(ctx)
-	contracts, err := pcq.WhereProjectId(project.Id).WhereIsEnabled(true).GetAll()
+	contracts, err := pcq.WhereProjectId(project.Id).WhereIsApproved(true).GetAll()
 	if err != nil {
 		return fmt.Errorf("failed to get contracts for project #%d: %v", project.ProjectId, err)
 	}
 	for _, contract := range contracts {
 		delete(bld.watchedContracts, contract.Address.Address)
 	}
+	// remove project from watched projects
+	delete(bld.watchedProjectIds, project.ProjectId)
 	return nil
 }
 
@@ -135,13 +138,15 @@ func (bld *blkDispatcher) handleProjectEnabled(ctx context.Context, log *eth.Log
 	}
 	// add contracts into watched contracts
 	pcq := transaction.ProjectContractQuery(ctx)
-	contracts, err := pcq.WhereProjectId(project.Id).WhereIsEnabled(true).GetAll()
+	contracts, err := pcq.WhereProjectId(project.Id).WhereIsApproved(true).GetAll()
 	if err != nil {
 		return fmt.Errorf("failed to get contracts for project #%d: %v", project.ProjectId, err)
 	}
 	for _, contract := range contracts {
-		bld.watchedContracts[contract.Address.Address] = project.Id
+		bld.watchedContracts[contract.Address.Address] = project
 	}
+	// add project into watched projects
+	bld.watchedProjectIds[project.ProjectId] = project
 	return nil
 }
 
@@ -156,24 +161,29 @@ func (bld *blkDispatcher) handleProjectContractAdded(ctx context.Context, log *e
 	if err != nil {
 		return fmt.Errorf("failed to unpack ProjectContractAdded event #%d/#%d: %v", log.BlockNumber, log.Index, err)
 	}
-	// fetch project
-	pq := transaction.ProjectQuery(ctx)
-	project, err := pq.WhereProjectId(log.Topics[1].Big().Uint64()).GetFirstOrFail()
-	if err != nil {
-		return fmt.Errorf("failed to get project #%d: %v", log.Topics[1].Big().Uint64(), err)
+	// get project from map
+	project, isWatched := bld.watchedProjectIds[log.Topics[1].Big().Uint64()]
+	if project == nil {
+		// in case project is not watched, we should fetch it from DB
+		pq := transaction.ProjectQuery(ctx)
+		project, err = pq.WhereProjectId(log.Topics[1].Big().Uint64()).GetFirstOrFail()
+		if err != nil {
+			return fmt.Errorf("failed to get project #%d: %v", log.Topics[1].Big().Uint64(), err)
+		}
 	}
 	// add contract
 	addr := types.Address{Address: common.BytesToAddress(log.Topics[2].Bytes())}
 	if err := transaction.StoreProjectContract(ctx, &types.ProjectContract{
 		ProjectId: project.Id,
 		Address:   &addr,
-		Enabled:   true,
+		Approved:  true,
 	}); err != nil {
 		return fmt.Errorf("failed to add contract %s for project #%d: %v", addr.Hex(), project.ProjectId, err)
 	}
-	// add contract into watched contracts
-	bld.watchedContracts[addr.Address] = project.Id
-
+	// add contract into watched contracts if project is watched
+	if isWatched {
+		bld.watchedContracts[addr.Address] = project
+	}
 	return nil
 }
 
@@ -194,7 +204,7 @@ func (bld *blkDispatcher) handleProjectContractRemoved(ctx context.Context, log 
 	if err := qb.WhereAddress(&addr).Delete(); err != nil {
 		return fmt.Errorf("failed to delete contract %s for project #%d: %v", addr.Hex(), log.Topics[1].Big().Uint64(), err)
 	}
-	// remove contract from watched contracts
+	// remove contract from watched contracts (if project is not watched, then delete is no-op)
 	delete(bld.watchedContracts, addr.Address)
 	return nil
 }
@@ -227,11 +237,10 @@ func (bld *blkDispatcher) handleProjectRecipientUpdated(ctx context.Context, log
 	if err != nil {
 		return fmt.Errorf("failed to unpack ProjectRewardsRecipientUpdated event #%d/#%d: %v", log.BlockNumber, log.Index, err)
 	}
-	// fetch project
-	pq := transaction.ProjectQuery(ctx)
-	project, err := pq.WhereProjectId(log.Topics[1].Big().Uint64()).GetFirstOrFail()
-	if err != nil {
-		return fmt.Errorf("failed to get project #%d: %v", log.Topics[1].Big().Uint64(), err)
+	// get project from map
+	project := bld.watchedProjectIds[log.Topics[1].Big().Uint64()]
+	if project == nil {
+		return fmt.Errorf("project #%d is not watched", log.Topics[1].Big().Uint64())
 	}
 	// update recipient
 	recipient := types.Address{Address: eventData["recipient"].(common.Address)}
@@ -254,11 +263,10 @@ func (bld *blkDispatcher) handleProjectOwnerUpdated(ctx context.Context, log *et
 	if err != nil {
 		return fmt.Errorf("failed to unpack ProjectOwnerUpdated event #%d/#%d: %v", log.BlockNumber, log.Index, err)
 	}
-	// fetch project
-	pq := transaction.ProjectQuery(ctx)
-	project, err := pq.WhereProjectId(log.Topics[1].Big().Uint64()).GetFirstOrFail()
-	if err != nil {
-		return fmt.Errorf("failed to get project #%d: %v", log.Topics[1].Big().Uint64(), err)
+	// get project from map
+	project := bld.watchedProjectIds[log.Topics[1].Big().Uint64()]
+	if project == nil {
+		return fmt.Errorf("project #%d is not watched", log.Topics[1].Big().Uint64())
 	}
 	// update owner
 	owner := types.Address{Address: eventData["owner"].(common.Address)}
@@ -281,11 +289,10 @@ func (bld *blkDispatcher) handleWithdrawalRequest(ctx context.Context, log *eth.
 	if err != nil {
 		return fmt.Errorf("failed to unpack ProjectOwnerUpdated event #%d/#%d: %v", log.BlockNumber, log.Index, err)
 	}
-	// fetch project
-	pq := transaction.ProjectQuery(ctx)
-	project, err := pq.WhereProjectId(log.Topics[1].Big().Uint64()).GetFirstOrFail()
-	if err != nil {
-		return fmt.Errorf("failed to get project #%d: %v", log.Topics[1].Big().Uint64(), err)
+	// get project from map
+	project := bld.watchedProjectIds[log.Topics[1].Big().Uint64()]
+	if project == nil {
+		return fmt.Errorf("project #%d is not watched", log.Topics[1].Big().Uint64())
 	}
 	// create withdrawal request
 	err = transaction.StoreWithdrawalRequest(ctx, &types.WithdrawalRequest{

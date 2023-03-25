@@ -32,10 +32,10 @@ func (qb *ProjectContractQueryBuilder) WhereProjectIdIn(ids []int64) *ProjectCon
 	return qb
 }
 
-// WhereIsEnabled adds a where clause to the query builder.
-func (qb *ProjectContractQueryBuilder) WhereIsEnabled(isEnabled bool) *ProjectContractQueryBuilder {
-	qb.where = append(qb.where, "is_enabled = :is_enabled")
-	qb.parameters["is_enabled"] = isEnabled
+// WhereIsApproved adds a where clause to the query builder.
+func (qb *ProjectContractQueryBuilder) WhereIsApproved(isApproved bool) *ProjectContractQueryBuilder {
+	qb.where = append(qb.where, "is_approved = :is_approved")
+	qb.parameters["is_approved"] = isApproved
 	return qb
 }
 
@@ -48,7 +48,7 @@ func (qb *ProjectContractQueryBuilder) WhereAddress(address *types.Address) *Pro
 
 // StoreProjectContract stores the project contract in the database.
 func (db *Db) StoreProjectContract(ctx context.Context, project *types.ProjectContract) error {
-	query := `INSERT INTO project_contract (project_id, address, is_enabled) VALUES (:project_id, :address, :is_enabled)`
+	query := `INSERT INTO project_contract (project_id, address, is_approved) VALUES (:project_id, :address, :is_approved)`
 	_, err := sqlx.NamedExecContext(ctx, db.con, query, project)
 	if err != nil {
 		db.log.Errorf("failed to store project contract %d: %v", project.Address.Hex(), err)

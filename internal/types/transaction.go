@@ -37,6 +37,9 @@ type Transaction struct {
 	// GasPrice represents gas price provided by the sender in Wei.
 	GasPrice *Big `json:"gasPrice" db:"gas_price"`
 
+	// RewardToClaim represents the amount of reward to claim in Wei.
+	RewardToClaim *Big `db:"reward_to_claim"`
+
 	// Logs represents a list of log records created along with the transaction
 	Logs []types.Log `json:"logs"`
 }

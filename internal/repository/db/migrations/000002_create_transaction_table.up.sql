@@ -8,5 +8,6 @@ CREATE TABLE IF NOT EXISTS transaction(
     from_address VARCHAR(40),
     to_address VARCHAR(40),
     gas_used BIGINT NOT NULL,
-    gas_price TEXT NOT NULL
+    gas_price TEXT NOT NULL,
+    reward_to_claim TEXT NOT NULL
 );
