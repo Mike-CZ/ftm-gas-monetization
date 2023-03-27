@@ -4,16 +4,16 @@ import (
 	"context"
 )
 
-// LastProcessedEpoch returns the last processed epoch number.
-func (repo *Repository) LastProcessedEpoch() (uint64, error) {
+// CurrentEpoch returns the current epoch number.
+func (repo *Repository) CurrentEpoch() (uint64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), dbQueryTimeoutDuration)
 	defer cancel()
-	return repo.db.LastProcessedEpoch(ctx)
+	return repo.db.CurrentEpoch(ctx)
 }
 
-// UpdateLastProcessedEpoch updates the last observed epoch number.
-func (repo *Repository) UpdateLastProcessedEpoch(id uint64) error {
+// UpdateCurrentEpoch updates the last observed epoch number.
+func (repo *Repository) UpdateCurrentEpoch(id uint64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), dbQueryTimeoutDuration)
 	defer cancel()
-	return repo.db.UpdateLastProcessedEpoch(ctx, id)
+	return repo.db.UpdateCurrentEpoch(ctx, id)
 }

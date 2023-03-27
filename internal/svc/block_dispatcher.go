@@ -26,8 +26,8 @@ type blkDispatcher struct {
 	watchedContracts map[common.Address]*types.Project
 	// watchedProjectIds represents a map of projects where key is `project_id` provided by contract.
 	watchedProjectIds map[uint64]*types.Project
-	// latestProcessedEpochId represents the latest epoch id.
-	latestProcessedEpochId uint64
+	// currentEpochId represents the current epoch id.
+	currentEpochId uint64
 }
 
 // name returns the name of the service used by orchestrator.
@@ -67,7 +67,6 @@ func (bld *blkDispatcher) execute() {
 		select {
 		case <-bld.sigStop:
 			return
-
 		case blk, ok := <-bld.inBlock:
 			// do we have a working channel?
 			if !ok {
@@ -98,7 +97,7 @@ func (bld *blkDispatcher) process(blk *types.Block) bool {
 
 // processTxs loops all the transactions in the block and process them.
 func (bld *blkDispatcher) processTxs(blk *types.Block) bool {
-	if uint64(blk.Epoch) <= bld.latestProcessedEpochId {
+	if uint64(blk.Epoch) < bld.currentEpochId {
 		bld.log.Debugf("block #%d is from an old epoch, skipping", blk.Number)
 		return true
 	}
@@ -106,22 +105,21 @@ func (bld *blkDispatcher) processTxs(blk *types.Block) bool {
 		bld.log.Debugf("empty block #%d processed", blk.Number)
 		return true
 	}
-	// process all blockchain transactions in database transaction
-	// to ensure all transactions are processed or none
+	// process all data in database transaction to ensure all transactions are processed or none
 	err := bld.repo.DatabaseTransaction(func(ctx context.Context, db *db.Db) error {
 		for _, th := range blk.Txs {
 			trx := bld.load(blk, th)
 			if trx == nil {
 				return fmt.Errorf("failed to load transaction %s", th.String())
 			}
-			// update last processed epoch id, so we can continue from here
-			if uint64(blk.Epoch) > (bld.latestProcessedEpochId + 1) {
-				// we subtract 1 because current epoch is not yet finished
-				bld.latestProcessedEpochId = uint64(blk.Epoch) - 1
-				if err := db.UpdateLastProcessedEpoch(ctx, bld.latestProcessedEpochId); err != nil {
-					return err
+			// we moved to a new epoch, store the previous one
+			if uint64(blk.Epoch) > bld.currentEpochId {
+				if err := bld.storePreviousEpoch(ctx, db, uint64(blk.Epoch)); err != nil {
+					return fmt.Errorf("failed to store previous epoch: %s", err.Error())
 				}
 			}
+			// set epoch id for the transaction
+			trx.Epoch = blk.Epoch
 			if bld.checkContractAndFillProjectId(trx) {
 				total := new(big.Int).Mul(trx.GasPrice.ToInt(), new(big.Int).SetUint64(uint64(*trx.GasUsed)))
 				reward := new(big.Int).Mul(total, big.NewInt(rewardsPercentage))
@@ -161,6 +159,44 @@ func (bld *blkDispatcher) processTxs(blk *types.Block) bool {
 	return true
 }
 
+// storePreviousEpoch stores the previous epoch data in the database.
+func (bld *blkDispatcher) storePreviousEpoch(ctx context.Context, db *db.Db, newEpochId uint64) error {
+	// update the current epoch id
+	if err := db.UpdateCurrentEpoch(ctx, newEpochId); err != nil {
+		return err
+	}
+
+	// map for temporarily storing projects to be updated
+	// var projects map[int64]*types.Project
+	var transactionsCount uint64 = 0
+	totalCollected := big.NewInt(0)
+	// get all transactions for the previous epoch and update generated rewards and number of transactions
+	tq := db.TransactionQuery(ctx)
+	txs, err := tq.WhereEpoch(bld.currentEpochId).GetAll()
+	if err != nil {
+		return err
+	}
+	for _, trx := range txs {
+		transactionsCount += 1
+		totalCollected = totalCollected.Add(totalCollected, trx.RewardToClaim.ToInt())
+	}
+	// increase the total amount collected
+	if totalCollected.Cmp(big.NewInt(0)) > 0 {
+		if err = db.IncreaseTotalAmountCollected(ctx, totalCollected); err != nil {
+			return err
+		}
+	}
+	// update the number of transactions
+	if transactionsCount > 0 {
+		if err = db.IncreaseTotalTransactionsCount(ctx, transactionsCount); err != nil {
+			return err
+		}
+	}
+	// set the new epoch id
+	bld.currentEpochId = newEpochId
+	return nil
+}
+
 // checkContractAndFillProjectId checks if the transaction is related to a contract and fills the project id.
 func (bld *blkDispatcher) checkContractAndFillProjectId(trx *types.Transaction) bool {
 	if trx.From != nil && bld.watchedContracts[trx.From.Address] != nil {
@@ -187,13 +223,13 @@ func (bld *blkDispatcher) load(blk *types.Block, th *common.Hash) *types.Transac
 	return trx
 }
 
-// initializeLastEpoch initializes the last processed epoch.
-func (bld *blkDispatcher) initializeLastEpoch() {
-	epoch, err := bld.repo.LastProcessedEpoch()
+// initializeCurrentEpoch initializes the current epoch.
+func (bld *blkDispatcher) initializeCurrentEpoch() {
+	epoch, err := bld.repo.CurrentEpoch()
 	if err != nil {
-		bld.log.Fatal("failed to get last processed epoch: %v", err)
+		bld.log.Fatal("failed to get current epoch: %v", err)
 	}
-	bld.latestProcessedEpochId = epoch
+	bld.currentEpochId = epoch
 }
 
 // initializeProjects initializes the list of watched projects.
@@ -202,9 +238,7 @@ func (bld *blkDispatcher) initializeProjects() {
 	bld.watchedProjectIds = make(map[uint64]*types.Project)
 	// get all active projects
 	pq := bld.repo.ProjectQuery()
-	// increase the epoch id by 1, because we want to get the projects that are active in the next epoch
-	// because we won't process already finished epochs
-	projects, err := pq.WhereActiveInEpoch(bld.latestProcessedEpochId + 1).GetAll()
+	projects, err := pq.WhereActiveInEpoch(bld.currentEpochId).GetAll()
 	if err != nil {
 		bld.log.Fatal("failed to get active projects: %v", err)
 	}
@@ -224,6 +258,6 @@ func (bld *blkDispatcher) initializeProjects() {
 
 // initializeTrackedData initializes the data tracked by the block dispatcher.
 func (bld *blkDispatcher) initializeTrackedData() {
-	bld.initializeLastEpoch()
+	bld.initializeCurrentEpoch()
 	bld.initializeProjects()
 }

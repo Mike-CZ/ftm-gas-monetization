@@ -88,6 +88,7 @@ func (s *DispatcherTestSuite) SetupSuite() {
 
 // SetupTest sets up the test
 func (s *DispatcherTestSuite) SetupTest() {
+	// migrate tables to ensure they are empty
 	err := s.testDb.Migrate()
 	assert.Nil(s.T(), err)
 	s.blkDispatcher.init()
@@ -102,6 +103,7 @@ func (s *DispatcherTestSuite) SetupTest() {
 
 // TearDownTest tears down the test
 func (s *DispatcherTestSuite) TearDownTest() {
+	// drop all tables on teardown
 	err := s.testDb.Drop()
 	assert.Nil(s.T(), err)
 }

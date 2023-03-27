@@ -43,7 +43,7 @@ func (s *DbTestSuite) TestDatabaseTransaction() {
 	err := s.db.DatabaseTransaction(context.Background(), func(ctx context.Context, db *Db) error {
 		err := s.db.UpdateLastProcessedBlock(ctx, 1)
 		assert.Nil(s.T(), err)
-		err = s.db.UpdateLastProcessedEpoch(ctx, 2)
+		err = s.db.UpdateCurrentEpoch(ctx, 2)
 		assert.Nil(s.T(), err)
 		return nil
 	})
@@ -53,7 +53,7 @@ func (s *DbTestSuite) TestDatabaseTransaction() {
 	block, err := s.db.LastProcessedBlock(context.Background())
 	assert.Nil(s.T(), err)
 	assert.EqualValues(s.T(), 1, block)
-	epoch, err := s.db.LastProcessedEpoch(context.Background())
+	epoch, err := s.db.CurrentEpoch(context.Background())
 	assert.Nil(s.T(), err)
 	assert.EqualValues(s.T(), 2, epoch)
 }
@@ -62,14 +62,14 @@ func (s *DbTestSuite) TestDatabaseTransactionRollback() {
 	// set values
 	err := s.db.UpdateLastProcessedBlock(context.Background(), 5)
 	assert.Nil(s.T(), err)
-	err = s.db.UpdateLastProcessedEpoch(context.Background(), 6)
+	err = s.db.UpdateCurrentEpoch(context.Background(), 6)
 	assert.Nil(s.T(), err)
 
 	// test update block and epoch and then rollback changes by returning error
 	err = s.db.DatabaseTransaction(context.Background(), func(ctx context.Context, db *Db) error {
 		err := db.UpdateLastProcessedBlock(ctx, 1)
 		assert.Nil(s.T(), err)
-		err = db.UpdateLastProcessedEpoch(ctx, 2)
+		err = db.UpdateCurrentEpoch(ctx, 2)
 		assert.Nil(s.T(), err)
 		return fmt.Errorf("test error")
 	})
@@ -79,7 +79,7 @@ func (s *DbTestSuite) TestDatabaseTransactionRollback() {
 	block, err := s.db.LastProcessedBlock(context.Background())
 	assert.Nil(s.T(), err)
 	assert.EqualValues(s.T(), 5, block)
-	epoch, err := s.db.LastProcessedEpoch(context.Background())
+	epoch, err := s.db.CurrentEpoch(context.Background())
 	assert.Nil(s.T(), err)
 	assert.EqualValues(s.T(), 6, epoch)
 }

@@ -5,6 +5,9 @@ CREATE TABLE IF NOT EXISTS project(
     receiver_address VARCHAR(40) NOT NULL,
     -- TODO: metadata info
     last_withdrawal_epoch BIGINT,
+    collected_rewards BIGINT,
+    claimed_rewards BIGINT,
+    transactions_count BIGINT NOT NULL,
     active_from_epoch BIGINT NOT NULL,
     active_to_epoch BIGINT
 );

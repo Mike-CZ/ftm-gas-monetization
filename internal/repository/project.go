@@ -33,6 +33,13 @@ func (repo *Repository) TotalAmountCollected() (*big.Int, error) {
 	return repo.db.TotalAmountCollected(ctx)
 }
 
+// SetTotalAmountCollected sets the total amount collected for all projects.
+func (repo *Repository) SetTotalAmountCollected(amount *big.Int) error {
+	ctx, cancel := context.WithTimeout(context.Background(), dbQueryTimeoutDuration)
+	defer cancel()
+	return repo.db.SetTotalAmountCollected(ctx, amount)
+}
+
 // IncreaseTotalAmountCollected increases the total amount collected for all projects.
 func (repo *Repository) IncreaseTotalAmountCollected(amount *big.Int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), dbQueryTimeoutDuration)
@@ -47,9 +54,37 @@ func (repo *Repository) TotalAmountClaimed() (*big.Int, error) {
 	return repo.db.TotalAmountClaimed(ctx)
 }
 
+// SetTotalAmountClaimed sets the total amount collected for all projects.
+func (repo *Repository) SetTotalAmountClaimed(amount *big.Int) error {
+	ctx, cancel := context.WithTimeout(context.Background(), dbQueryTimeoutDuration)
+	defer cancel()
+	return repo.db.SetTotalAmountClaimed(ctx, amount)
+}
+
 // IncreaseTotalAmountClaimed increases the total amount collected for all projects.
 func (repo *Repository) IncreaseTotalAmountClaimed(amount *big.Int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), dbQueryTimeoutDuration)
 	defer cancel()
 	return repo.db.IncreaseTotalAmountClaimed(ctx, amount)
+}
+
+// TotalTransactionsCount returns the total transactions count for all projects.
+func (repo *Repository) TotalTransactionsCount() (uint64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dbQueryTimeoutDuration)
+	defer cancel()
+	return repo.db.TotalTransactionsCount(ctx)
+}
+
+// SetTotalTransactionsCount sets the total transactions count for all projects.
+func (repo *Repository) SetTotalTransactionsCount(count uint64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), dbQueryTimeoutDuration)
+	defer cancel()
+	return repo.db.SetTotalTransactionsCount(ctx, count)
+}
+
+// IncreaseTotalTransactionsCount increases the total transactions count for all projects.
+func (repo *Repository) IncreaseTotalTransactionsCount(amount uint64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), dbQueryTimeoutDuration)
+	defer cancel()
+	return repo.db.IncreaseTotalTransactionsCount(ctx, amount)
 }

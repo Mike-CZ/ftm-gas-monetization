@@ -22,6 +22,9 @@ type Transaction struct {
 	// BlockNumber represents number of the block where this transaction was in. nil when it's pending.
 	BlockNumber *hexutil.Uint64 `json:"blockNumber" db:"block_number"`
 
+	// Epoch represents the epoch that transaction belongs to.
+	Epoch hexutil.Uint64 `db:"epoch_number"`
+
 	// Timestamp represents the time stamp of the transaction.
 	Timestamp time.Time `json:"timestamp" db:"timestamp"`
 
