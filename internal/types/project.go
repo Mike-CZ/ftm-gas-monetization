@@ -8,6 +8,7 @@ type Project struct {
 	LastWithdrawalEpoch *uint64  `db:"last_withdrawal_epoch"`
 	CollectedRewards    *Big     `db:"collected_rewards"`
 	ClaimedRewards      *Big     `db:"claimed_rewards"`
+	RewardsToClaim      *Big     `db:"rewards_to_claim"`
 	TransactionsCount   uint64   `db:"transactions_count"`
 	ActiveFromEpoch     uint64   `db:"active_from_epoch"`
 	ActiveToEpoch       *uint64  `db:"active_to_epoch"`

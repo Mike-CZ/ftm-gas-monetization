@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/rpc"
 	"github.com/ethereum/go-ethereum/common"
@@ -33,8 +34,9 @@ type TestChain struct {
 	FunderAcc          *testAccount
 	ProjectsManagerAcc *testAccount
 	ProjectOwnerAcc    *testAccount
-	*rpc.Rpc
-	container testcontainers.Container
+	DataProviderAcc    *testAccount
+	container          testcontainers.Container
+	port               string
 }
 
 func SetupTestChain(logger *logger.AppLogger) *TestChain {
@@ -51,14 +53,25 @@ func SetupTestChain(logger *logger.AppLogger) *TestChain {
 		return nil
 	}
 	return &TestChain{
-		Rpc:                rpc.New(fmt.Sprintf("http://localhost:%s", port), logger),
 		container:          container,
 		RawRpc:             c,
 		AdminAcc:           initializeTestAccount("bb39aa88008bc6260ff9ebc816178c47a01c44efe55810ea1f271c00f5878812"),
 		FunderAcc:          initializeTestAccount("29c8b4ff78e41dafd561f5cd4a90103faf20a5b509a4b6281947b8fcdcfa8f71"),
 		ProjectsManagerAcc: initializeTestAccount("460503be96e3b97c2d6fb737bef83d89df42e4a36adef2e8fb4f0976b70d1b2a"),
 		ProjectOwnerAcc:    initializeTestAccount("1516a467486cd4340e5f0e8193eea05c9106bb0dce26a03047580c25c9191f93"),
+		DataProviderAcc:    initializeTestAccount("904d5dea0bdffb09d78a81c15f0b3b893f504679eb8cd1de585309cad58e6285"),
+		port:               port,
 	}
+}
+
+// SetupTestRpc initializes rpc client
+func (tch *TestChain) SetupTestRpc(contractAddress common.Address, logger *logger.AppLogger) *rpc.Rpc {
+	cfg := &config.Rpc{
+		OperaRpcUrl:         fmt.Sprintf("http://localhost:%s", tch.port),
+		GasMonetizationAddr: contractAddress.String(),
+		DataProviderPK:      "904d5dea0bdffb09d78a81c15f0b3b893f504679eb8cd1de585309cad58e6285",
+	}
+	return rpc.New(cfg, logger)
 }
 
 func (tch *TestChain) TearDown() {

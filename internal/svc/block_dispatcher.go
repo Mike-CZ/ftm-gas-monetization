@@ -73,7 +73,6 @@ func (bld *blkDispatcher) execute() {
 				bld.log.Notice("block channel closed, terminating %s", bld.name())
 				return
 			}
-
 			// process the new block
 			bld.log.Debugf("block #%d arrived", uint64(blk.Number))
 			if !bld.process(blk) {
@@ -165,9 +164,8 @@ func (bld *blkDispatcher) storePreviousEpoch(ctx context.Context, db *db.Db, new
 	if err := db.UpdateCurrentEpoch(ctx, newEpochId); err != nil {
 		return err
 	}
-
 	// map for temporarily storing projects to be updated
-	// var projects map[int64]*types.Project
+	projects := make(map[int64]*types.Project)
 	var transactionsCount uint64 = 0
 	totalCollected := big.NewInt(0)
 	// get all transactions for the previous epoch and update generated rewards and number of transactions
@@ -176,9 +174,40 @@ func (bld *blkDispatcher) storePreviousEpoch(ctx context.Context, db *db.Db, new
 	if err != nil {
 		return err
 	}
+	// loop all transactions from the previous epoch and update data
 	for _, trx := range txs {
 		transactionsCount += 1
 		totalCollected = totalCollected.Add(totalCollected, trx.RewardToClaim.ToInt())
+		project, exists := projects[trx.ProjectId]
+		if !exists {
+			pq := db.ProjectQuery(ctx)
+			project, err = pq.WhereId(trx.ProjectId).GetFirstOrFail()
+			if err != nil {
+				return err
+			}
+			// if project is watched, take it from the map so the fields are updated for log handler
+			watched, isWatched := bld.watchedProjectIds[project.ProjectId]
+			if isWatched {
+				project = watched
+			}
+			projects[trx.ProjectId] = project
+		}
+		// increase collected amount
+		if project.CollectedRewards == nil {
+			project.CollectedRewards = trx.RewardToClaim
+		} else {
+			res := new(big.Int).Add(project.CollectedRewards.ToInt(), trx.RewardToClaim.ToInt())
+			project.CollectedRewards = &types.Big{Big: hexutil.Big(*res)}
+		}
+		// increase rewards to claim
+		if project.RewardsToClaim == nil {
+			project.RewardsToClaim = trx.RewardToClaim
+		} else {
+			res := new(big.Int).Add(project.RewardsToClaim.ToInt(), trx.RewardToClaim.ToInt())
+			project.RewardsToClaim = &types.Big{Big: hexutil.Big(*res)}
+		}
+		// increase number of transactions
+		project.TransactionsCount += 1
 	}
 	// increase the total amount collected
 	if totalCollected.Cmp(big.NewInt(0)) > 0 {
@@ -189,6 +218,12 @@ func (bld *blkDispatcher) storePreviousEpoch(ctx context.Context, db *db.Db, new
 	// update the number of transactions
 	if transactionsCount > 0 {
 		if err = db.IncreaseTotalTransactionsCount(ctx, transactionsCount); err != nil {
+			return err
+		}
+	}
+	// loop through all projects and update the data
+	for _, project := range projects {
+		if err = db.UpdateProject(ctx, project); err != nil {
 			return err
 		}
 	}

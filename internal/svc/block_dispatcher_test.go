@@ -6,6 +6,7 @@ import (
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/db"
+	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/rpc"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/rpc/contracts"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/utils"
@@ -40,6 +41,7 @@ var (
 type DispatcherTestSuite struct {
 	suite.Suite
 	testChain *TestChain
+	testRpc   *rpc.Rpc
 	testDb    *db.TestDatabase
 	testRepo  *repository.Repository
 	// gas monetization contract and sessions
@@ -49,6 +51,7 @@ type DispatcherTestSuite struct {
 	funderSession          *contracts.GasMonetizationSession
 	projectsManagerSession *contracts.GasMonetizationSession
 	projectOwnerSession    *contracts.GasMonetizationSession
+	dataProviderSession    *contracts.GasMonetizationSession
 	// sfc mock for obtaining the current epoch and session
 	sfcMockAddr common.Address
 	sfcMock     *contracts.SfcMock
@@ -68,8 +71,9 @@ func (s *DispatcherTestSuite) SetupSuite() {
 	testLogger := logger.New(log.Writer(), "test", logging.ERROR)
 	// initialize dependencies
 	s.testChain = SetupTestChain(testLogger)
+	s.testRpc = s.testChain.SetupTestRpc(s.gasMonetizationAddr, testLogger)
 	s.testDb = db.SetupTestDatabase(testLogger)
-	s.testRepo = repository.NewWithInstances(s.testDb.Db, s.testChain.Rpc, testLogger)
+	s.testRepo = repository.NewWithInstances(s.testDb.Db, s.testRpc, testLogger)
 	// initialize block dispatcher
 	s.blkDispatcher = blkDispatcher{
 		service: service{
@@ -88,15 +92,18 @@ func (s *DispatcherTestSuite) SetupSuite() {
 
 // SetupTest sets up the test
 func (s *DispatcherTestSuite) SetupTest() {
-	// migrate tables to ensure they are empty
-	err := s.testDb.Migrate()
-	assert.Nil(s.T(), err)
-	s.blkDispatcher.init()
 	s.initializeSfc()
 	s.initializeSfcSession()
 	s.initializeGasMonetization()
 	s.initializeGasMonetizationSessions()
 	s.initializeGasMonetizationRoles()
+	// set data provider session, because contract is re-deployed
+	// on every test, so the session is lost
+	s.testRpc.SetDataProviderSession(s.dataProviderSession)
+	// migrate tables to ensure they are empty
+	err := s.testDb.Migrate()
+	assert.Nil(s.T(), err)
+	s.blkDispatcher.init()
 	// shift epoch by one by beginning of the test
 	s.shiftEpochs(s.currentEpoch + 1)
 }
@@ -289,28 +296,6 @@ func (s *DispatcherTestSuite) TestUpdateOwner() {
 }
 
 // TestUpdateOwner tests the update owner functionality
-func (s *DispatcherTestSuite) TestWithdrawalRequest() {
-	s.setupTestProject()
-	// fund the contract
-	s.fundContract(new(big.Int).SetUint64(5_000))
-	// request withdrawal
-	_, err := s.projectOwnerSession.RequestWithdrawal(new(big.Int).SetUint64(1))
-	assert.Nil(s.T(), err)
-	// process the latest block
-	s.processBlock(s.getLatestBlock())
-	// fetch project
-	pq := s.testRepo.ProjectQuery()
-	project, err := pq.WhereOwner(&projectOwner).GetFirstOrFail()
-	assert.Nil(s.T(), err)
-	// assert withdrawal request exists
-	wrq := s.testRepo.WithdrawalRequestQuery()
-	wr, err := wrq.WhereProjectId(project.Id).GetFirstOrFail()
-	assert.Nil(s.T(), err)
-	assert.EqualValues(s.T(), project.Id, wr.ProjectId)
-	assert.EqualValues(s.T(), s.currentEpoch, wr.Epoch)
-}
-
-// TestUpdateOwner tests the update owner functionality
 func (s *DispatcherTestSuite) TestCollectRelatedTransactions() {
 	s.setupTestProject()
 	// send 10 related transactions
@@ -440,7 +425,99 @@ func (s *DispatcherTestSuite) TestAmountToWithdrawIsCalculatedCorrectly() {
 	b := new(big.Int).Mul(a, big.NewInt(rewardsPercentage))
 	expectedAmount := new(big.Int).Div(b, big.NewInt(100))
 	assert.EqualValues(s.T(), expectedAmount, transaction.RewardToClaim.ToInt())
+	// send 10 transactions
+	for i := 0; i < 10; i++ {
+		s.sendTransaction(s.testChain.FunderAcc, projectContracts[0].Address, big.NewInt(1_000))
+		s.processBlock(s.getLatestBlock())
+	}
+	// shift epoch and send transaction to trigger rewards calculation
+	s.shiftEpochs(10)
+	s.sendTransaction(s.testChain.FunderAcc, projectContracts[0].Address, big.NewInt(1_000))
+	s.processBlock(s.getLatestBlock())
+	// we sent 11 transactions in total, expected amount should be 11 * expectedAmount
+	// the 12th transaction is the one that triggers rewards calculation, but it's not
+	// included in the rewards calculation for previous epoch
+	totalAmount, err := s.testRepo.TotalAmountCollected()
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), new(big.Int).Mul(expectedAmount, big.NewInt(11)), totalAmount)
+	// verify that amount is also updated on project
+	pq := s.testRepo.ProjectQuery()
+	project, err := pq.WhereOwner(&projectOwner).GetFirstOrFail()
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), new(big.Int).Mul(expectedAmount, big.NewInt(11)), project.CollectedRewards.ToInt())
+	assert.EqualValues(s.T(), new(big.Int).Mul(expectedAmount, big.NewInt(11)), project.RewardsToClaim.ToInt())
 }
+
+// TestNumberOfTransactionsIsStoredCorrectly tests that number of transactions is stored correctly
+func (s *DispatcherTestSuite) TestNumberOfTransactionsIsStoredCorrectly() {
+	s.setupTestProject()
+	// send 10 transactions
+	for i := 0; i < 10; i++ {
+		s.sendTransaction(s.testChain.FunderAcc, projectContracts[0].Address, big.NewInt(1_000))
+		s.processBlock(s.getLatestBlock())
+	}
+	// shift epoch and send transaction to trigger rewards calculation
+	s.shiftEpochs(10)
+	s.sendTransaction(s.testChain.FunderAcc, projectContracts[0].Address, big.NewInt(1_000))
+	s.processBlock(s.getLatestBlock())
+	// 10 transactions should be stored, the 11th transaction is the one that triggers rewards calculation,
+	// but it's not included in the rewards calculation for previous epoch
+	totalCount, err := s.testRepo.TotalTransactionsCount()
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), 10, totalCount)
+	// verify that number of transactions is also updated on project
+	pq := s.testRepo.ProjectQuery()
+	project, err := pq.WhereOwner(&projectOwner).GetFirstOrFail()
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), 10, project.TransactionsCount)
+}
+
+// TestWithdrawal tests that withdrawal works correctly
+func (s *DispatcherTestSuite) TestWithdrawal() {
+	s.setupTestProject()
+	// fund the contract with required amount - 21_000 stands for transaction cost
+	requiredAmount := 10 * TestChainGasPrice * 21_000 * rewardsPercentage / 100
+	s.fundContract(new(big.Int).SetUint64(uint64(requiredAmount)))
+	// send 10 transactions
+	for i := 0; i < 10; i++ {
+		s.sendTransaction(s.testChain.FunderAcc, projectContracts[0].Address, big.NewInt(1_000))
+		s.processBlock(s.getLatestBlock())
+	}
+	// shift epoch to trigger rewards calculation
+	s.shiftEpochs(withdrawalFrequency)
+	// request withdrawal
+	_, err := s.projectOwnerSession.RequestWithdrawal(new(big.Int).SetUint64(1))
+	assert.Nil(s.T(), err)
+	// process the latest block
+	s.processBlock(s.getLatestBlock())
+	// process next block that contains event about withdrawal
+	s.processBlock(s.getLatestBlock())
+	// fetch project
+	pq := s.testRepo.ProjectQuery()
+	project, err := pq.WhereOwner(&projectOwner).GetFirstOrFail()
+	assert.Nil(s.T(), err)
+	// assert withdrawal request exists
+	wrq := s.testRepo.WithdrawalRequestQuery()
+	wr, err := wrq.WhereProjectId(project.Id).GetFirstOrFail()
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), project.Id, wr.ProjectId)
+	assert.EqualValues(s.T(), s.currentEpoch, wr.Epoch)
+	// assert that withdrawal was executed
+	totalClaimed, err := s.testRepo.TotalAmountClaimed()
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), project.ClaimedRewards.ToInt(), totalClaimed)
+	assert.EqualValues(s.T(), 0, project.RewardsToClaim.ToInt().Uint64())
+}
+
+//// TestClaimingRewards tests that rewards can be claimed
+//func (s *DispatcherTestSuite) TestProjectWithdrawal() {
+//	s.setupTestProject()
+//	// send 10 transactions
+//	for i := 0; i < 10; i++ {
+//		s.sendTransaction(s.testChain.FunderAcc, projectContracts[0].Address, big.NewInt(1_000))
+//		s.processBlock(s.getLatestBlock())
+//	}
+//}
 
 // initializeSfc deploys the sfc mock contract to the test chain
 func (s *DispatcherTestSuite) initializeSfc() {
@@ -491,6 +568,7 @@ func (s *DispatcherTestSuite) initializeGasMonetizationSessions() {
 	s.funderSession = initializeGasMonetizationSession(s.T(), s.gasMonetization, s.testChain.FunderAcc.PrivateKey)
 	s.projectsManagerSession = initializeGasMonetizationSession(s.T(), s.gasMonetization, s.testChain.ProjectsManagerAcc.PrivateKey)
 	s.projectOwnerSession = initializeGasMonetizationSession(s.T(), s.gasMonetization, s.testChain.ProjectOwnerAcc.PrivateKey)
+	s.dataProviderSession = initializeGasMonetizationSession(s.T(), s.gasMonetization, s.testChain.DataProviderAcc.PrivateKey)
 }
 
 // initializeSfcSession initializes a session for sfc mock
@@ -536,6 +614,9 @@ func (s *DispatcherTestSuite) initializeGasMonetizationRoles() {
 	assert.Nil(s.T(), err)
 	_, err = s.adminSession.GrantRole(projectsManagerRole, s.testChain.ProjectsManagerAcc.Address)
 	assert.Nil(s.T(), err)
+	dataProviderRole, err := s.gasMonetization.REWARDSDATAPROVIDERROLE(nil)
+	assert.Nil(s.T(), err)
+	_, err = s.adminSession.GrantRole(dataProviderRole, s.testChain.DataProviderAcc.Address)
 }
 
 // shiftEpochs shifts the current epoch by the given number of epochs

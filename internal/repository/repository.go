@@ -23,7 +23,7 @@ func New(cfg *config.Config, log *logger.AppLogger) *Repository {
 	repoLogger := log.ModuleLogger("repository")
 	repo := Repository{
 		db:  db.New(&cfg.DB, repoLogger),
-		rpc: rpc.New(cfg.OperaRpcUrl, repoLogger),
+		rpc: rpc.New(&cfg.Rpc, repoLogger),
 		log: repoLogger,
 	}
 

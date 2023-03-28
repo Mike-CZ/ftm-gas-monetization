@@ -7,6 +7,7 @@ import (
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/db"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	eth "github.com/ethereum/go-ethereum/core/types"
 	"math/big"
 )
@@ -26,6 +27,7 @@ func (bld *blkDispatcher) initializeTopics() {
 		common.HexToHash("0xc96c5102d284d786d29b5d0d7dda6ce493724355b762993adfef62b7220f161c"): bld.handleProjectRecipientUpdated,
 		common.HexToHash("0xffc579e983741c17a95792c458e2ae8c933b1bf7f5cd84f3bca571505c25d42a"): bld.handleProjectOwnerUpdated,
 		common.HexToHash("0x6b19bb08027e5bee64cbe3f99bbbfb671c0e134643993f0ad046fd01d020b342"): bld.handleWithdrawalRequest,
+		common.HexToHash("0x709b466596e79834da0e8ee56d4624cb3e8464a18cd5ae894790b672594c402c"): bld.handleWithdrawalCompleted,
 	}
 }
 
@@ -298,12 +300,70 @@ func (bld *blkDispatcher) handleWithdrawalRequest(ctx context.Context, log *eth.
 		return fmt.Errorf("project #%d is not watched", log.Topics[1].Big().Uint64())
 	}
 	// create withdrawal request
+	epoch := eventData["requestEpochNumber"].(*big.Int).Uint64()
 	err = transaction.StoreWithdrawalRequest(ctx, &types.WithdrawalRequest{
 		ProjectId: project.Id,
 		Epoch:     eventData["requestEpochNumber"].(*big.Int).Uint64(),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to store withdrawal request for project #%d: %v", project.ProjectId, err)
+	}
+	// submit amount to withdraw to contract
+	if project.RewardsToClaim == nil {
+		return fmt.Errorf("project #%d has no rewards to claim", project.ProjectId)
+	}
+	// complete withdrawal for given project
+	if err = bld.repo.CompleteWithdrawal(project.ProjectId, epoch, project.RewardsToClaim.ToInt()); err != nil {
+		return fmt.Errorf("failed to submit withdrawal request for project #%d: %v", project.ProjectId, err)
+	}
+	return nil
+}
+
+// handleWithdrawalCompleted is an event handler for the WithdrawalCompleted event.
+func (bld *blkDispatcher) handleWithdrawalCompleted(ctx context.Context, log *eth.Log, transaction *db.Db) error {
+	if len(log.Data) != 96 || len(log.Topics) != 2 {
+		return nil
+	}
+	// parse event data
+	eventData := make(map[string]interface{})
+	err := bld.repo.GasMonetizationAbi().UnpackIntoMap(eventData, "WithdrawalCompleted", log.Data)
+	if err != nil {
+		return fmt.Errorf("failed to unpack WithdrawalCompleted event #%d/#%d: %v", log.BlockNumber, log.Index, err)
+	}
+	// get project from map
+	project := bld.watchedProjectIds[log.Topics[1].Big().Uint64()]
+	if project == nil {
+		// in case project is not watched, we should fetch it from DB
+		pq := transaction.ProjectQuery(ctx)
+		project, err = pq.WhereProjectId(log.Topics[1].Big().Uint64()).GetFirstOrFail()
+		if err != nil {
+			return fmt.Errorf("failed to get project #%d: %v", log.Topics[1].Big().Uint64(), err)
+		}
+	}
+	//requestEpoch := eventData["requestEpochNumber"].(*big.Int).Uint64()
+	withdrawalEpoch := eventData["withdrawalEpochNumber"].(*big.Int).Uint64()
+	amount := eventData["amount"].(*big.Int)
+	// update project claimed amount
+	if project.ClaimedRewards == nil {
+		project.ClaimedRewards = &types.Big{Big: hexutil.Big(*amount)}
+	} else {
+		res := new(big.Int).Add(project.ClaimedRewards.ToInt(), amount)
+		project.ClaimedRewards = &types.Big{Big: hexutil.Big(*res)}
+	}
+	// subtract claimed amount from rewards to claim
+	if project.RewardsToClaim == nil {
+		return fmt.Errorf("project #%d has no rewards to claim", project.ProjectId)
+	}
+	res := new(big.Int).Sub(project.RewardsToClaim.ToInt(), amount)
+	project.RewardsToClaim = &types.Big{Big: hexutil.Big(*res)}
+	// update last withdrawal epoch
+	project.LastWithdrawalEpoch = &withdrawalEpoch
+	if err = transaction.UpdateProject(ctx, project); err != nil {
+		return fmt.Errorf("failed to update project #%d: %v", project.ProjectId, err)
+	}
+	// increase total claimed amount
+	if err = transaction.IncreaseTotalAmountClaimed(ctx, amount); err != nil {
+		return fmt.Errorf("failed to increase total claimed amount: %v", err)
 	}
 	return nil
 }

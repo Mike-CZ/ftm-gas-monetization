@@ -16,6 +16,6 @@ func applyDefaults(cfg *viper.Viper) {
 	// logger
 	cfg.SetDefault("loggingLevel", logging.INFO)
 
-	// rpc api
-	cfg.SetDefault("operaRpcUrl", "https://rpcapi.fantom.network")
+	// rpc
+	cfg.SetDefault("rpc.operaRpcUrl", "https://rpcapi.fantom.network")
 }

@@ -47,21 +47,21 @@ func (repo *Repository) IncreaseTotalAmountCollected(amount *big.Int) error {
 	return repo.db.IncreaseTotalAmountCollected(ctx, amount)
 }
 
-// TotalAmountClaimed returns the total amount collected for all projects.
+// TotalAmountClaimed returns the total amount claimed for all projects.
 func (repo *Repository) TotalAmountClaimed() (*big.Int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), dbQueryTimeoutDuration)
 	defer cancel()
 	return repo.db.TotalAmountClaimed(ctx)
 }
 
-// SetTotalAmountClaimed sets the total amount collected for all projects.
+// SetTotalAmountClaimed sets the total amount claimed for all projects.
 func (repo *Repository) SetTotalAmountClaimed(amount *big.Int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), dbQueryTimeoutDuration)
 	defer cancel()
 	return repo.db.SetTotalAmountClaimed(ctx, amount)
 }
 
-// IncreaseTotalAmountClaimed increases the total amount collected for all projects.
+// IncreaseTotalAmountClaimed increases the total amount claimed for all projects.
 func (repo *Repository) IncreaseTotalAmountClaimed(amount *big.Int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), dbQueryTimeoutDuration)
 	defer cancel()

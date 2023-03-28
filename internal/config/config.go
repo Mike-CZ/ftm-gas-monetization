@@ -6,8 +6,16 @@ import (
 
 type Config struct {
 	DB           DB
+	Rpc          Rpc
 	LoggingLevel logging.Level
-	OperaRpcUrl  string
+}
+
+type Rpc struct {
+	OperaRpcUrl string
+	// address of the gas monetization contract
+	GasMonetizationAddr string
+	// private key of the account that will be used to provide data for gas monetization contract
+	DataProviderPK string
 }
 
 type DB struct {

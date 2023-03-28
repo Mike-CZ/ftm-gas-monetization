@@ -42,9 +42,10 @@ func (qb *ProjectQueryBuilder) WhereActiveInEpoch(epoch uint64) *ProjectQueryBui
 // StoreProject stores the project in the database.
 func (db *Db) StoreProject(ctx context.Context, project *types.Project) error {
 	query := `INSERT INTO project (owner_address, project_id, receiver_address, last_withdrawal_epoch, 
-                     collected_rewards, claimed_rewards, transactions_count, active_from_epoch, active_to_epoch) 
+                     collected_rewards, claimed_rewards, rewards_to_claim, transactions_count, active_from_epoch, 
+                     active_to_epoch) 
 		VALUES (:owner_address, :project_id, :receiver_address, :last_withdrawal_epoch, :collected_rewards, 
-		        :claimed_rewards, :transactions_count, :active_from_epoch, :active_to_epoch)
+		        :claimed_rewards, :rewards_to_claim, :transactions_count, :active_from_epoch, :active_to_epoch)
 		RETURNING id`
 
 	rows, err := sqlx.NamedQueryContext(ctx, db.con, query, project)
@@ -81,8 +82,9 @@ func (db *Db) UpdateProject(ctx context.Context, project *types.Project) error {
 	}
 	query := `UPDATE project SET owner_address = :owner_address, receiver_address = :receiver_address,
                    last_withdrawal_epoch = :last_withdrawal_epoch, collected_rewards = :collected_rewards,
-                   claimed_rewards = :claimed_rewards, transactions_count = :transactions_count,
-                   active_from_epoch = :active_from_epoch, active_to_epoch = :active_to_epoch WHERE id = :id`
+                   claimed_rewards = :claimed_rewards, rewards_to_claim = :rewards_to_claim, transactions_count 
+                   = :transactions_count, active_from_epoch = :active_from_epoch, active_to_epoch = :active_to_epoch 
+               WHERE id = :id`
 
 	_, err := sqlx.NamedExecContext(ctx, db.con, query, project)
 	if err != nil {
