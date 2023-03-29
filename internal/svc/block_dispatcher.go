@@ -227,6 +227,20 @@ func (bld *blkDispatcher) storePreviousEpoch(ctx context.Context, db *db.Db, new
 			return err
 		}
 	}
+	// delete already processed transactions
+	// this will get called in the next epoch, but it's ok
+	// TODO: might get changed
+	wrq := db.WithdrawalRequestQuery(ctx)
+	rqs, err := wrq.GetAll()
+	if err != nil {
+		return err
+	}
+	for _, r := range rqs {
+		tq = db.TransactionQuery(ctx)
+		if err = tq.WhereProjectId(r.ProjectId).WhereEpochLte(bld.currentEpochId).Delete(); err != nil {
+			return err
+		}
+	}
 	// set the new epoch id
 	bld.currentEpochId = newEpochId
 	return nil

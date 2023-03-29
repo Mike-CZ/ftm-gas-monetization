@@ -302,8 +302,10 @@ func (bld *blkDispatcher) handleWithdrawalRequest(ctx context.Context, log *eth.
 	// create withdrawal request
 	epoch := eventData["requestEpochNumber"].(*big.Int).Uint64()
 	err = transaction.StoreWithdrawalRequest(ctx, &types.WithdrawalRequest{
-		ProjectId: project.Id,
-		Epoch:     eventData["requestEpochNumber"].(*big.Int).Uint64(),
+		ProjectId:     project.Id,
+		RequestEpoch:  eventData["requestEpochNumber"].(*big.Int).Uint64(),
+		WithdrawEpoch: nil,
+		Amount:        nil,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to store withdrawal request for project #%d: %v", project.ProjectId, err)
@@ -340,9 +342,20 @@ func (bld *blkDispatcher) handleWithdrawalCompleted(ctx context.Context, log *et
 			return fmt.Errorf("failed to get project #%d: %v", log.Topics[1].Big().Uint64(), err)
 		}
 	}
-	//requestEpoch := eventData["requestEpochNumber"].(*big.Int).Uint64()
+	requestEpoch := eventData["requestEpochNumber"].(*big.Int).Uint64()
 	withdrawalEpoch := eventData["withdrawalEpochNumber"].(*big.Int).Uint64()
 	amount := eventData["amount"].(*big.Int)
+	// fill withdrawal request
+	wrq := transaction.WithdrawalRequestQuery(ctx)
+	request, err := wrq.WhereProjectId(project.Id).WhereRequestEpoch(requestEpoch).GetFirstOrFail()
+	if err != nil {
+		return fmt.Errorf("failed to get withdrawal request for project #%d: %v", project.ProjectId, err)
+	}
+	request.WithdrawEpoch = &withdrawalEpoch
+	request.Amount = &types.Big{Big: hexutil.Big(*amount)}
+	if err = transaction.UpdateWithdrawalRequest(ctx, request); err != nil {
+		return fmt.Errorf("failed to update withdrawal request for project #%d: %v", project.ProjectId, err)
+	}
 	// update project claimed amount
 	if project.ClaimedRewards == nil {
 		project.ClaimedRewards = &types.Big{Big: hexutil.Big(*amount)}

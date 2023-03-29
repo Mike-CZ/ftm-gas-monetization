@@ -496,28 +496,27 @@ func (s *DispatcherTestSuite) TestWithdrawal() {
 	pq := s.testRepo.ProjectQuery()
 	project, err := pq.WhereOwner(&projectOwner).GetFirstOrFail()
 	assert.Nil(s.T(), err)
-	// assert withdrawal request exists
-	wrq := s.testRepo.WithdrawalRequestQuery()
-	wr, err := wrq.WhereProjectId(project.Id).GetFirstOrFail()
-	assert.Nil(s.T(), err)
-	assert.EqualValues(s.T(), project.Id, wr.ProjectId)
-	assert.EqualValues(s.T(), s.currentEpoch, wr.Epoch)
 	// assert that withdrawal was executed
 	totalClaimed, err := s.testRepo.TotalAmountClaimed()
 	assert.Nil(s.T(), err)
 	assert.EqualValues(s.T(), project.ClaimedRewards.ToInt(), totalClaimed)
 	assert.EqualValues(s.T(), 0, project.RewardsToClaim.ToInt().Uint64())
+	// assert withdrawal request exists and is filled
+	wrq := s.testRepo.WithdrawalRequestQuery()
+	wr, err := wrq.WhereProjectId(project.Id).GetFirstOrFail()
+	assert.Nil(s.T(), err)
+	assert.EqualValues(s.T(), project.Id, wr.ProjectId)
+	assert.EqualValues(s.T(), s.currentEpoch, wr.RequestEpoch)
+	assert.EqualValues(s.T(), s.currentEpoch, *wr.WithdrawEpoch)
+	assert.EqualValues(s.T(), wr.Amount.ToInt(), totalClaimed)
+	// shift epoch to trigger transactions deletion
+	// assert transactions were deleted
+	tq := s.testRepo.TransactionQuery()
+	transactions, err := tq.WhereProjectId(project.Id).GetAll()
+	panic(len(transactions))
+	assert.Nil(s.T(), err)
+	assert.Empty(s.T(), transactions)
 }
-
-//// TestClaimingRewards tests that rewards can be claimed
-//func (s *DispatcherTestSuite) TestProjectWithdrawal() {
-//	s.setupTestProject()
-//	// send 10 transactions
-//	for i := 0; i < 10; i++ {
-//		s.sendTransaction(s.testChain.FunderAcc, projectContracts[0].Address, big.NewInt(1_000))
-//		s.processBlock(s.getLatestBlock())
-//	}
-//}
 
 // initializeSfc deploys the sfc mock contract to the test chain
 func (s *DispatcherTestSuite) initializeSfc() {
