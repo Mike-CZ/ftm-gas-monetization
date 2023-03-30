@@ -124,7 +124,6 @@ func (bld *blkDispatcher) processTxs(blk *types.Block) bool {
 				reward := new(big.Int).Mul(total, big.NewInt(rewardsPercentage))
 				finalReward := new(big.Int).Div(reward, big.NewInt(100))
 				trx.RewardToClaim = &types.Big{Big: hexutil.Big(*finalReward)}
-				//trx.RewardToClaim
 				if err := db.StoreTransaction(ctx, trx); err != nil {
 					return err
 				}
@@ -242,6 +241,7 @@ func (bld *blkDispatcher) checkContractAndFillProjectId(trx *types.Transaction) 
 		trx.ProjectId = bld.watchedContracts[trx.To.Address].Id
 		return true
 	}
+	// TODO: Tx tracing
 	return false
 }
 

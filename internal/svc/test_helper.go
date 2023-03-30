@@ -66,12 +66,15 @@ func SetupTestChain(logger *logger.AppLogger) *TestChain {
 
 // SetupTestRpc initializes rpc client
 func (tch *TestChain) SetupTestRpc(contractAddress common.Address, logger *logger.AppLogger) *rpc.Rpc {
-	cfg := &config.Rpc{
-		OperaRpcUrl:         fmt.Sprintf("http://localhost:%s", tch.port),
-		GasMonetizationAddr: contractAddress.String(),
-		DataProviderPK:      "904d5dea0bdffb09d78a81c15f0b3b893f504679eb8cd1de585309cad58e6285",
+	rpcCfg := &config.Rpc{
+		OperaRpcUrl: fmt.Sprintf("http://localhost:%s", tch.port),
 	}
-	return rpc.New(cfg, logger)
+	gmCfg := &config.GasMonetization{
+		ContractAddress: contractAddress.String(),
+		DataProviderPK:  "904d5dea0bdffb09d78a81c15f0b3b893f504679eb8cd1de585309cad58e6285",
+		StartFromBlock:  0,
+	}
+	return rpc.New(rpcCfg, gmCfg, logger)
 }
 
 func (tch *TestChain) TearDown() {

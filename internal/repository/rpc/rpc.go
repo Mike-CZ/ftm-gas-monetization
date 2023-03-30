@@ -30,10 +30,10 @@ type Rpc struct {
 }
 
 // New creates a new instance of the RPC client.
-func New(cfg *config.Rpc, log *logger.AppLogger) *Rpc {
+func New(rpcCfg *config.Rpc, gmCfg *config.GasMonetization, log *logger.AppLogger) *Rpc {
 	rpcLogger := log.ModuleLogger("rpc")
 
-	c, err := connect(cfg.OperaRpcUrl)
+	c, err := connect(rpcCfg.OperaRpcUrl)
 	if err != nil {
 		rpcLogger.Criticalf("can not connect to the Opera node; %s", err.Error())
 		return nil
@@ -51,7 +51,7 @@ func New(cfg *config.Rpc, log *logger.AppLogger) *Rpc {
 	}
 
 	// initialize data provider session
-	if err = loadDataProviderSession(rpc, cfg); err != nil {
+	if err = loadDataProviderSession(rpc, gmCfg); err != nil {
 		rpcLogger.Criticalf("can not initialize data provider session; %s", err.Error())
 		return nil
 	}
@@ -98,14 +98,14 @@ func loadABIFile(path string) (*abi.ABI, error) {
 }
 
 // initializeDataProviderSession initializes the data provider session.
-func loadDataProviderSession(rpc *Rpc, cfg *config.Rpc) error {
+func loadDataProviderSession(rpc *Rpc, cfg *config.GasMonetization) error {
 	key, err := crypto.HexToECDSA(cfg.DataProviderPK)
 	if err != nil {
 		return err
 	}
 	// create gas monetization instance
 	ethClient := ethclient.NewClient(rpc.ftm)
-	gm, err := contracts.NewGasMonetization(common.HexToAddress(cfg.GasMonetizationAddr), ethClient)
+	gm, err := contracts.NewGasMonetization(common.HexToAddress(cfg.ContractAddress), ethClient)
 	if err != nil {
 		return err
 	}
