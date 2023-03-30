@@ -24,9 +24,9 @@ func (qb *TransactionQueryBuilder) WhereEpoch(epoch uint64) *TransactionQueryBui
 	return qb
 }
 
-// WhereEpochLte adds a where clause to the query builder.
-func (qb *TransactionQueryBuilder) WhereEpochLte(epoch uint64) *TransactionQueryBuilder {
-	qb.where = append(qb.where, "epoch_number <= :epoch_number")
+// WhereEpochLt adds a where clause to the query builder.
+func (qb *TransactionQueryBuilder) WhereEpochLt(epoch uint64) *TransactionQueryBuilder {
+	qb.where = append(qb.where, "epoch_number < :epoch_number")
 	qb.parameters["epoch_number"] = epoch
 	return qb
 }

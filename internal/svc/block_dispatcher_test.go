@@ -483,10 +483,15 @@ func (s *DispatcherTestSuite) TestWithdrawal() {
 		s.sendTransaction(s.testChain.FunderAcc, projectContracts[0].Address, big.NewInt(1_000))
 		s.processBlock(s.getLatestBlock())
 	}
+	// assert we have 10 related transactions
+	tq := s.testRepo.TransactionQuery()
+	transactions, err := tq.GetAll()
+	assert.Nil(s.T(), err)
+	assert.Len(s.T(), transactions, 10)
 	// shift epoch to trigger rewards calculation
 	s.shiftEpochs(withdrawalFrequency)
 	// request withdrawal
-	_, err := s.projectOwnerSession.RequestWithdrawal(new(big.Int).SetUint64(1))
+	_, err = s.projectOwnerSession.RequestWithdrawal(new(big.Int).SetUint64(1))
 	assert.Nil(s.T(), err)
 	// process the latest block
 	s.processBlock(s.getLatestBlock())
@@ -509,11 +514,9 @@ func (s *DispatcherTestSuite) TestWithdrawal() {
 	assert.EqualValues(s.T(), s.currentEpoch, wr.RequestEpoch)
 	assert.EqualValues(s.T(), s.currentEpoch, *wr.WithdrawEpoch)
 	assert.EqualValues(s.T(), wr.Amount.ToInt(), totalClaimed)
-	// shift epoch to trigger transactions deletion
 	// assert transactions were deleted
-	tq := s.testRepo.TransactionQuery()
-	transactions, err := tq.WhereProjectId(project.Id).GetAll()
-	panic(len(transactions))
+	tq = s.testRepo.TransactionQuery()
+	transactions, err = tq.GetAll()
 	assert.Nil(s.T(), err)
 	assert.Empty(s.T(), transactions)
 }

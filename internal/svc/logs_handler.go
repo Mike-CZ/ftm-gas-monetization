@@ -378,5 +378,13 @@ func (bld *blkDispatcher) handleWithdrawalCompleted(ctx context.Context, log *et
 	if err = transaction.IncreaseTotalAmountClaimed(ctx, amount); err != nil {
 		return fmt.Errorf("failed to increase total claimed amount: %v", err)
 	}
+	// because rewards are always for previous epoch, metadata are already collected,
+	// we are free to delete related transaction... we also need to delete transactions
+	// from previous epoch, so we won't delete transactions from current epoch.
+	// TODO: This might change
+	tq := transaction.TransactionQuery(ctx)
+	if err = tq.WhereProjectId(project.Id).WhereEpochLt(withdrawalEpoch).Delete(); err != nil {
+		return fmt.Errorf("failed to delete transactions for project #%d: %v", project.ProjectId, err)
+	}
 	return nil
 }
