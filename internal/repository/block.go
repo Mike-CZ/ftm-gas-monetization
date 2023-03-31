@@ -22,7 +22,17 @@ func (repo *Repository) BlockHeight() (*hexutil.Big, error) {
 func (repo *Repository) LastProcessedBlock() (uint64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), dbQueryTimeoutDuration)
 	defer cancel()
-	return repo.db.LastProcessedBlock(ctx)
+	block, err := repo.db.LastProcessedBlock(ctx)
+	if err != nil {
+		return 0, err
+	}
+	// if already processed block is greater than the start block, return it
+	startBlock := repo.rpc.StartFromBlock()
+	if block > startBlock {
+		return block, nil
+	}
+	// otherwise return the start block
+	return startBlock, nil
 }
 
 // UpdateLastProcessedBlock updates the last observed block number.

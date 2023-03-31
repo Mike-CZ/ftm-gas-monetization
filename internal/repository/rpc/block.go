@@ -13,6 +13,11 @@ const (
 	BlockTypeLatest = "latest"
 )
 
+// StartFromBlock returns the block number from which the processing should start.
+func (rpc *Rpc) StartFromBlock() uint64 {
+	return rpc.startFromBlock
+}
+
 // BlockHeight returns the current block height of the Opera blockchain.
 func (rpc *Rpc) BlockHeight() (*hexutil.Big, error) {
 	// keep track of the operation

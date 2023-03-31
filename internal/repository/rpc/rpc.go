@@ -25,6 +25,7 @@ type Rpc struct {
 	ftm *client.Client
 	log *logger.AppLogger
 
+	startFromBlock         uint64
 	gasMonetizationAddress common.Address
 	abiGasMonetization     *abi.ABI
 	dataProviderSession    *contracts.GasMonetizationSession
@@ -44,6 +45,7 @@ func New(rpcCfg *config.Rpc, gmCfg *config.GasMonetization, log *logger.AppLogge
 		ftm:                    c,
 		log:                    rpcLogger,
 		gasMonetizationAddress: common.HexToAddress(gmCfg.ContractAddress),
+		startFromBlock:         gmCfg.StartFromBlock,
 	}
 
 	// load and parse ABIs
