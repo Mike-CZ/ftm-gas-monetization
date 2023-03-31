@@ -131,7 +131,9 @@ func (bld *blkDispatcher) processTxs(blk *types.Block) bool {
 			// process logs
 			if trx.Logs != nil && len(trx.Logs) > 0 {
 				for _, log := range trx.Logs {
-					// TODO: check if the log is from a contract we are interested in
+					if log.Address != bld.repo.GasMonetizationAddress() {
+						continue
+					}
 					handler, ok := bld.topics[log.Topics[0]]
 					if ok && log.BlockNumber == uint64(blk.Number) {
 						bld.log.Infof("known topic %s found, processing", log.Topics[0].String())

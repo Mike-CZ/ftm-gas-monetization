@@ -25,8 +25,9 @@ type Rpc struct {
 	ftm *client.Client
 	log *logger.AppLogger
 
-	abiGasMonetization  *abi.ABI
-	dataProviderSession *contracts.GasMonetizationSession
+	gasMonetizationAddress common.Address
+	abiGasMonetization     *abi.ABI
+	dataProviderSession    *contracts.GasMonetizationSession
 }
 
 // New creates a new instance of the RPC client.
@@ -40,8 +41,9 @@ func New(rpcCfg *config.Rpc, gmCfg *config.GasMonetization, log *logger.AppLogge
 	}
 
 	rpc := &Rpc{
-		ftm: c,
-		log: rpcLogger,
+		ftm:                    c,
+		log:                    rpcLogger,
+		gasMonetizationAddress: common.HexToAddress(gmCfg.ContractAddress),
 	}
 
 	// load and parse ABIs

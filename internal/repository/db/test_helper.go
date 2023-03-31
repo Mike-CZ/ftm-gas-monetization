@@ -31,7 +31,7 @@ func SetupTestDatabase(logger *logger.AppLogger) *TestDatabase {
 	defer cancel()
 	container, port, err := createContainer(ctx, logger)
 	if err != nil {
-		logger.Fatal("failed to setup test", err)
+		logger.Fatal("failed to setup test database", err)
 	}
 	db := New(
 		&config.DB{
@@ -43,8 +43,8 @@ func SetupTestDatabase(logger *logger.AppLogger) *TestDatabase {
 		},
 		logger)
 	if db == nil {
-		logger.Fatal("failed to create database instance")
 		_ = container.Terminate(context.Background())
+		logger.Fatal("failed to create database instance")
 	}
 	return &TestDatabase{
 		Db:        db,

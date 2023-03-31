@@ -97,9 +97,10 @@ func (s *DispatcherTestSuite) SetupTest() {
 	s.initializeGasMonetization()
 	s.initializeGasMonetizationSessions()
 	s.initializeGasMonetizationRoles()
-	// set data provider session, because contract is re-deployed
-	// on every test, so the session is lost
+	// set data provider session and contract address, because
+	//contract is re-deployed on every test, so the session is lost
 	s.testRpc.SetDataProviderSession(s.dataProviderSession)
+	s.testRpc.SetGasMonetizationAddress(s.gasMonetizationAddr)
 	// migrate tables to ensure they are empty
 	err := s.testDb.Migrate()
 	assert.Nil(s.T(), err)
