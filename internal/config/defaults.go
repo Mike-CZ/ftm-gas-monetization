@@ -22,5 +22,5 @@ func applyDefaults(cfg *viper.Viper) {
 	// gas monetization
 	cfg.SetDefault("gasMonetization.contractAddress", "0x9f6089633272C23cFD6E9C146b6E87cc9f065718")
 	cfg.SetDefault("gasMonetization.dataProviderPK", "904d5dea0bdffb09d78a81c15f0b3b893f504679eb8cd1de585309cad58e6285")
-	cfg.SetDefault("startFromBlock", 0)
+	cfg.SetDefault("gasMonetization.startFromBlock", 0)
 }
