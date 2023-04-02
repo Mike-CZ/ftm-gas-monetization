@@ -12,6 +12,11 @@ func (rpc *Rpc) CompleteWithdrawal(projectId uint64, epoch uint64, amount *big.I
 	return err
 }
 
+// HasPendingWithdrawal returns true if there is a pending withdrawal for the given project.
+func (rpc *Rpc) HasPendingWithdrawal(projectId uint64, epoch uint64) (bool, error) {
+	return rpc.dataProviderSession.HasPendingWithdrawal(new(big.Int).SetUint64(projectId), new(big.Int).SetUint64(epoch))
+}
+
 // GasMonetizationAddress returns the address of the gas monetization contract.
 func (rpc *Rpc) GasMonetizationAddress() common.Address {
 	return rpc.gasMonetizationAddress

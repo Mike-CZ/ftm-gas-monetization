@@ -340,9 +340,16 @@ func (bld *blkDispatcher) handleWithdrawalRequest(ctx context.Context, log *eth.
 	if project.RewardsToClaim == nil {
 		return fmt.Errorf("project #%d has no rewards to claim", project.ProjectId)
 	}
-	// complete withdrawal for given project
+	// complete withdrawal for given project if it is still pending
+	isPending, err := bld.repo.HasPendingWithdrawal(project.ProjectId, epoch)
+	if err != nil {
+		return fmt.Errorf("failed to check if withdrawal is pending for project #%d: %v", project.ProjectId, err)
+	}
+	if !isPending {
+		return nil
+	}
 	if err = bld.repo.CompleteWithdrawal(project.ProjectId, epoch, project.RewardsToClaim.ToInt()); err != nil {
-		return fmt.Errorf("failed to submit withdrawal request for project #%d: %v", project.ProjectId, err)
+		bld.log.Criticalf("failed to complete withdrawal for project #%d: %v", project.ProjectId, err)
 	}
 	return nil
 }
