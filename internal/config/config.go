@@ -12,7 +12,8 @@ type Config struct {
 }
 
 type Rpc struct {
-	OperaRpcUrl string
+	OperaRpcUrl   string
+	TracingRpcUrl string
 }
 
 type GasMonetization struct {

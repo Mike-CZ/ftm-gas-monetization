@@ -18,6 +18,7 @@ func applyDefaults(cfg *viper.Viper) {
 
 	// rpc
 	cfg.SetDefault("rpc.operaRpcUrl", "https://rpcapi.fantom.network")
+	cfg.SetDefault("rpc.tracingRpcUrl", "https://rpcapi-tracing.fantom.network")
 
 	// gas monetization
 	cfg.SetDefault("gasMonetization.contractAddress", "0x9f6089633272C23cFD6E9C146b6E87cc9f065718")

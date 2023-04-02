@@ -3,13 +3,16 @@ package svc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/db"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	eth "github.com/ethereum/go-ethereum/core/types"
+	"io"
 	"math/big"
+	"net/http"
 )
 
 // EventHandler represents a function used to process event log record.
@@ -51,12 +54,19 @@ func (bld *blkDispatcher) handleProjectAdded(ctx context.Context, log *eth.Log, 
 		ProjectId:           log.Topics[1].Big().Uint64(),
 		OwnerAddress:        &ownerAddr,
 		ReceiverAddress:     &receiverAddr,
+		Url:                 eventData["metadataUri"].(string),
 		LastWithdrawalEpoch: nil,
 		CollectedRewards:    nil,
 		ClaimedRewards:      nil,
 		TransactionsCount:   0,
 		ActiveFromEpoch:     eventData["activeFromEpoch"].(*big.Int).Uint64(),
 		ActiveToEpoch:       nil,
+	}
+	if err = setMetadata(project); err != nil {
+		// set empty strings on failure
+		project.Name = ""
+		project.ImageUrl = ""
+		bld.log.Criticalf("failed to set metadata for project #%d: %v", project.ProjectId, err)
 	}
 	// store project
 	if err := transaction.StoreProject(ctx, project); err != nil {
@@ -225,9 +235,25 @@ func (bld *blkDispatcher) handleProjectMetadataUriUpdated(ctx context.Context, l
 	if err != nil {
 		return fmt.Errorf("failed to unpack ProjectMetadataUriUpdated event #%d/#%d: %v", log.BlockNumber, log.Index, err)
 	}
-	// TODO: update metadata
-	//projectId := log.Topics[1].Big().Uint64()
-	//uri := eventData["metadataUri"].(string)
+	projectId := log.Topics[1].Big().Uint64()
+	uri := eventData["metadataUri"].(string)
+	// get project from map
+	project := bld.watchedProjectIds[projectId]
+	if project == nil {
+		// in case project is not watched, we should fetch it from DB
+		pq := transaction.ProjectQuery(ctx)
+		project, err = pq.WhereProjectId(projectId).GetFirstOrFail()
+		if err != nil {
+			return fmt.Errorf("failed to get project #%d: %v", projectId, err)
+		}
+	}
+	project.Url = uri
+	if err = setMetadata(project); err != nil {
+		bld.log.Criticalf("failed to set metadata for project #%d: %v", projectId, err)
+	}
+	if err = transaction.UpdateProject(ctx, project); err != nil {
+		return fmt.Errorf("failed to update project #%d: %v", projectId, err)
+	}
 	return nil
 }
 
@@ -386,5 +412,25 @@ func (bld *blkDispatcher) handleWithdrawalCompleted(ctx context.Context, log *et
 	if err = tq.WhereProjectId(project.Id).WhereEpochLt(withdrawalEpoch).Delete(); err != nil {
 		return fmt.Errorf("failed to delete transactions for project #%d: %v", project.ProjectId, err)
 	}
+	return nil
+}
+
+// setMetadata sets metadata for given project.
+func setMetadata(project *types.Project) error {
+	resp, err := http.Get(project.Url)
+	if err != nil {
+		return fmt.Errorf("failed to get project metadata: %v", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read project metadata: %v", err)
+	}
+	var metadata types.ProjectMetadata
+	if err = json.Unmarshal(body, &metadata); err != nil {
+		return fmt.Errorf("failed to unmarshal project metadata: %v", err)
+	}
+	project.Name = metadata.Name
+	project.ImageUrl = metadata.ImageUrl
 	return nil
 }

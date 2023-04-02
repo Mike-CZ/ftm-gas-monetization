@@ -3,7 +3,9 @@ CREATE TABLE IF NOT EXISTS project(
     project_id BIGINT NOT NULL,
     owner_address VARCHAR(40) NOT NULL,
     receiver_address VARCHAR(40) NOT NULL,
-    -- TODO: metadata info
+    name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    image_url TEXT NOT NULL,
     last_withdrawal_epoch BIGINT,
     collected_rewards TEXT,
     claimed_rewards TEXT,

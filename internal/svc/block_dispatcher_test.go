@@ -3,6 +3,7 @@ package svc
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/db"
@@ -19,6 +20,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"log"
 	"math/big"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -29,10 +32,15 @@ const (
 )
 
 var (
-	projectOwner     = types.Address{Address: common.HexToAddress("0x7E618Ee2D08fcb730f3fd8C3F4e7C7Fd1A166ABD")}
-	projectRecipient = types.Address{Address: common.HexToAddress("0xf54d3639B783B3d77cce0A6c2BcE042a201F8614")}
-	projectUri       = "test-uri"
-	projectContracts = []types.Address{
+	projectOwner           = types.Address{Address: common.HexToAddress("0x7E618Ee2D08fcb730f3fd8C3F4e7C7Fd1A166ABD")}
+	projectRecipient       = types.Address{Address: common.HexToAddress("0xf54d3639B783B3d77cce0A6c2BcE042a201F8614")}
+	projectUrl             = "/metadata.json"
+	projectUpdatedUrl      = "/updated_metadata.json"
+	projectName            = "Test project"
+	projectUpdatedName     = "Updated Test project"
+	projectImageUrl        = "test.png"
+	projectUpdatedImageUrl = "updated_test.png"
+	projectContracts       = []types.Address{
 		{Address: common.HexToAddress("0x8d2CfE86E5bc0D1a99f7848CE96B86AbCe72413F")},
 		{Address: common.HexToAddress("0x4B763D578273F5704cF5D57cF4A46452Ef5Cd659")},
 	}
@@ -60,6 +68,8 @@ type DispatcherTestSuite struct {
 	currentEpoch uint64
 	// blkDispatcher is the block dispatcher to test
 	blkDispatcher blkDispatcher
+	// mock server for testing the data provider
+	mockServerUrl string
 }
 
 func TestDispatcherTestSuite(t *testing.T) {
@@ -74,6 +84,8 @@ func (s *DispatcherTestSuite) SetupSuite() {
 	s.testRpc = s.testChain.SetupTestRpc(s.gasMonetizationAddr, testLogger)
 	s.testDb = db.SetupTestDatabase(testLogger)
 	s.testRepo = repository.NewWithInstances(s.testDb.Db, s.testRpc, testLogger)
+	// initialize mock server to serve metadata
+	s.initializeMockServer()
 	// initialize block dispatcher
 	s.blkDispatcher = blkDispatcher{
 		service: service{
@@ -141,6 +153,9 @@ func (s *DispatcherTestSuite) TestAddProject() {
 	assert.EqualValues(s.T(), uint64(1), project.ProjectId)
 	assert.EqualValues(s.T(), projectOwner.Hex(), project.OwnerAddress.Hex())
 	assert.EqualValues(s.T(), projectRecipient.Hex(), project.ReceiverAddress.Hex())
+	assert.EqualValues(s.T(), s.mockServerUrl+projectUrl, project.Url)
+	assert.EqualValues(s.T(), projectName, project.Name)
+	assert.EqualValues(s.T(), projectImageUrl, project.ImageUrl)
 	assert.Nil(s.T(), project.LastWithdrawalEpoch)
 	assert.EqualValues(s.T(), s.currentEpoch, project.ActiveFromEpoch)
 	assert.Nil(s.T(), project.ActiveToEpoch)
@@ -148,7 +163,7 @@ func (s *DispatcherTestSuite) TestAddProject() {
 	pcq := s.testRepo.ProjectContractQuery()
 	pcl, err := pcq.WhereProjectId(project.Id).GetAll()
 	assert.Nil(s.T(), err)
-	assert.Len(s.T(), projectContracts, 2)
+	assert.Len(s.T(), pcl, len(projectContracts))
 	for i, pc := range pcl {
 		assert.EqualValues(s.T(), project.Id, pc.ProjectId)
 		assert.True(s.T(), pc.Approved)
@@ -238,19 +253,23 @@ func (s *DispatcherTestSuite) TestRemoveContract() {
 // TestUpdateUri tests the update uri functionality
 func (s *DispatcherTestSuite) TestUpdateUri() {
 	s.setupTestProject()
-	// assert the contract does exist
+	// assert the project does exist
 	pq := s.testRepo.ProjectQuery()
-	_, err := pq.WhereOwner(&projectOwner).GetFirstOrFail()
+	project, err := pq.WhereOwner(&projectOwner).GetFirstOrFail()
 	assert.Nil(s.T(), err)
 	// remove contract
 	_, err = s.projectsManagerSession.UpdateProjectMetadataUri(
-		new(big.Int).SetUint64(1),
-		"new-uri",
-	)
+		new(big.Int).SetUint64(project.ProjectId), s.mockServerUrl+projectUpdatedUrl)
 	assert.Nil(s.T(), err)
 	// process the latest block
 	s.processBlock(s.getLatestBlock())
-	// TODO: assert metadata changed
+	// get updated project
+	project, err = pq.WhereOwner(&projectOwner).GetFirstOrFail()
+	assert.Nil(s.T(), err)
+	// assert values changed
+	assert.EqualValues(s.T(), s.mockServerUrl+projectUpdatedUrl, project.Url)
+	assert.EqualValues(s.T(), projectUpdatedName, project.Name)
+	assert.EqualValues(s.T(), projectUpdatedImageUrl, project.ImageUrl)
 }
 
 // TestUpdateRewardsRecipient tests the update rewards recipient functionality
@@ -643,7 +662,7 @@ func (s *DispatcherTestSuite) fundContract(amount *big.Int) {
 func (s *DispatcherTestSuite) setupTestProject() {
 	contractAddresses := utils.Map(projectContracts, func(c *types.Address) common.Address { return c.Address })
 	_, err := s.projectsManagerSession.AddProject(
-		projectOwner.Address, projectRecipient.Address, projectUri, contractAddresses)
+		projectOwner.Address, projectRecipient.Address, s.mockServerUrl+projectUrl, contractAddresses)
 	assert.Nil(s.T(), err)
 	// process the latest block
 	s.processBlock(s.getLatestBlock())
@@ -671,4 +690,24 @@ func (s *DispatcherTestSuite) processBlock(blk *types.Block) {
 	case <-time.After(5 * time.Second):
 		s.T().Fatal("block not processed")
 	}
+}
+
+// initializeMockServer initializes the mock server that serves metadata for the test project
+func (s *DispatcherTestSuite) initializeMockServer() {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == projectUrl {
+			w.WriteHeader(http.StatusOK)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"name": "%s", "image_url": "%s"}`, projectName, projectImageUrl)))
+			return
+		}
+		if r.URL.Path == projectUpdatedUrl {
+			w.WriteHeader(http.StatusOK)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(fmt.Sprintf(`{"name": "%s", "image_url": "%s"}`, projectUpdatedName, projectUpdatedImageUrl)))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	s.mockServerUrl = ts.URL
 }
