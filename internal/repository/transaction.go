@@ -17,3 +17,7 @@ func (repo *Repository) TransactionQuery() db.TransactionQueryBuilder {
 func (repo *Repository) Transaction(hash *common.Hash) (*types.Transaction, error) {
 	return repo.rpc.Transaction(hash)
 }
+
+func (repo *Repository) TraceTransaction(hash common.Hash) {
+	repo.tracer.TraceTransaction(hash)
+}

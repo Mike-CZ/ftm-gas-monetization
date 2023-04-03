@@ -81,9 +81,10 @@ func (s *DispatcherTestSuite) SetupSuite() {
 	testLogger := logger.New(log.Writer(), "test", logging.ERROR)
 	// initialize dependencies
 	s.testChain = SetupTestChain(testLogger)
-	s.testRpc = s.testChain.SetupTestRpc(s.gasMonetizationAddr, testLogger)
+	r, t := s.testChain.SetupTestRpc(s.gasMonetizationAddr, testLogger)
+	s.testRpc = r
 	s.testDb = db.SetupTestDatabase(testLogger)
-	s.testRepo = repository.NewWithInstances(s.testDb.Db, s.testRpc, testLogger)
+	s.testRepo = repository.NewWithInstances(s.testDb.Db, s.testRpc, t, testLogger)
 	// initialize mock server to serve metadata
 	s.initializeMockServer()
 	// initialize block dispatcher

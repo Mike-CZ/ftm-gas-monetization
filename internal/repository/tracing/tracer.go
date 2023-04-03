@@ -1,0 +1,40 @@
+package tracing
+
+import (
+	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
+	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
+	client "github.com/ethereum/go-ethereum/rpc"
+)
+
+// Tracer represents the implementation of the Blockchain tracing interface for Fantom Opera node.
+type Tracer struct {
+	ftm *client.Client
+	log *logger.AppLogger
+}
+
+// New creates a new instance of the TracingRpc client.
+func New(rpcCfg *config.Rpc, log *logger.AppLogger) *Tracer {
+	rpcLogger := log.ModuleLogger("tracing_rpc")
+
+	c, err := connect(rpcCfg.TracingRpcUrl)
+	if err != nil {
+		rpcLogger.Criticalf("can not connect to the Opera tracing node; %s", err.Error())
+		return nil
+	}
+
+	rpc := &Tracer{
+		ftm: c,
+		log: rpcLogger,
+	}
+
+	return rpc
+}
+
+// connect opens RPC connection to the Opera node.
+func connect(url string) (*client.Client, error) {
+	c, err := client.Dial(url)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}

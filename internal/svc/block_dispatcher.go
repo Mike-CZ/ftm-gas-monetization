@@ -235,6 +235,8 @@ func (bld *blkDispatcher) storePreviousEpoch(ctx context.Context, db *db.Db, new
 
 // checkContractAndFillProjectId checks if the transaction is related to a contract and fills the project id.
 func (bld *blkDispatcher) checkContractAndFillProjectId(trx *types.Transaction) bool {
+	bld.repo.TraceTransaction(trx.Hash.Hash)
+
 	if trx.From != nil && bld.watchedContracts[trx.From.Address] != nil {
 		trx.ProjectId = bld.watchedContracts[trx.From.Address].Id
 		return true
