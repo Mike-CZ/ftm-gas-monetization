@@ -1,0 +1,19 @@
+# Root schema definition
+schema {
+    query: Query
+}
+
+# Entry points for querying the API
+type Query {
+    # Value of all claimed tokens
+    totalAmountClaimed: Long!
+
+    # Value of all available tokens to claim
+    totalAmountCollected: Long!
+
+    # Version represents the API server version responding to your requests.
+    totalTransactionCount: Long!
+
+    # Projects represents list of validated projects
+    projects: [Project!]!
+}

@@ -1,0 +1,13 @@
+{
+  "name": "Fantom Gas Monetization API Schema",
+  "schemaPath": "./schema.graphql",
+  "documents": "./**/*.graphql",
+  "extensions": {
+    "endpoints": {
+      "Local GraphQL Endpoint": {
+        "url": "http://localhost:16761/api",
+        "introspect": false
+      }
+    }
+  }
+}

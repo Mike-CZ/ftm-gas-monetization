@@ -7,8 +7,10 @@ import (
 type Config struct {
 	DB              DB
 	Rpc             Rpc
+	Api             ApiServer
+	Logger          Logging
 	GasMonetization GasMonetization
-	LoggingLevel    logging.Level
+	AppName         string
 }
 
 type Rpc struct {
@@ -30,4 +32,20 @@ type DB struct {
 	Host     string
 	Port     string
 	Name     string
+}
+
+type ApiServer struct {
+	BindAddress     string
+	DomainAddress   string
+	ReadTimeout     int
+	WriteTimeout    int
+	IdleTimeout     int
+	HeaderTimeout   int
+	ResolverTimeout int
+	CorsOrigin      []string
+}
+
+type Logging struct {
+	LoggingLevel logging.Level
+	LogFormat    string
 }

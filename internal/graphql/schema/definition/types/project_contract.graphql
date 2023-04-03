@@ -1,0 +1,13 @@
+type ProjectContract {
+    # Id of contract
+    id: Long!
+
+    # id of project
+    projectId: Long!
+
+    # address of contract
+    address: Address!
+
+    # approved contract
+    approved: Boolean!
+}

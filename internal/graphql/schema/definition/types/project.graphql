@@ -1,0 +1,34 @@
+type Project {
+    # Id of project
+    id: Long!
+
+    # List of contracts
+    contracts: [ProjectContract!]!
+
+    # Address of owner
+    ownerAddress: Address!
+
+    # Address to claim rewards
+    receiverAddress: Address!
+
+    # Name of project
+    name: String!
+
+    # URL of icon
+    imageUrl: String!
+
+    # URL
+    url: String!
+
+    # Sum of all transactions
+    transactionsCount: Long!
+
+    # Sum of claimed and pending rewards
+    collectedRewards: Long!
+
+    # Amount of tokens already received
+    claimedRewards: Long!
+
+    # Amount of tokens for claim
+    rewardsToClaim: Long!
+}

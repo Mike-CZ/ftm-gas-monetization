@@ -28,7 +28,7 @@ type App struct {
 func Bootstrap(ctx *cli.Context, cfg *config.Config) {
 	instance = App{
 		cfg: cfg,
-		log: logger.New(ctx.App.Writer, ctx.App.HelpName, cfg.LoggingLevel),
+		log: logger.New(ctx.App.Writer, ctx.App.HelpName, cfg.Logger.LoggingLevel),
 	}
 }
 
@@ -47,12 +47,4 @@ func Repository() *repository.Repository {
 		instance.repository = repository.New(instance.cfg, instance.log)
 	})
 	return instance.repository
-}
-
-// Close terminates running services.
-func Close() {
-	if instance.manager != nil {
-		instance.manager.Close()
-		instance.manager = nil
-	}
 }
