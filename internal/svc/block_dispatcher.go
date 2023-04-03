@@ -117,16 +117,10 @@ func (bld *blkDispatcher) processTxs(blk *types.Block) bool {
 					return fmt.Errorf("failed to store previous epoch: %s", err.Error())
 				}
 			}
-			// set epoch id for the transaction
+			// store transaction into database
 			trx.Epoch = blk.Epoch
-			if bld.checkContractAndFillProjectId(trx) {
-				total := new(big.Int).Mul(trx.GasPrice.ToInt(), new(big.Int).SetUint64(uint64(*trx.GasUsed)))
-				reward := new(big.Int).Mul(total, big.NewInt(rewardsPercentage))
-				finalReward := new(big.Int).Div(reward, big.NewInt(100))
-				trx.RewardToClaim = &types.Big{Big: hexutil.Big(*finalReward)}
-				if err := db.StoreTransaction(ctx, trx); err != nil {
-					return err
-				}
+			if err := bld.storeTransaction(ctx, db, trx); err != nil {
+				return fmt.Errorf("failed to store transaction: %s", err.Error())
 			}
 			// process logs
 			if trx.Logs != nil && len(trx.Logs) > 0 {
@@ -233,19 +227,41 @@ func (bld *blkDispatcher) storePreviousEpoch(ctx context.Context, db *db.Db, new
 	return nil
 }
 
-// checkContractAndFillProjectId checks if the transaction is related to a contract and fills the project id.
-func (bld *blkDispatcher) checkContractAndFillProjectId(trx *types.Transaction) bool {
-	bld.repo.TraceTransaction(trx.Hash.Hash)
+// storeTransaction stores a transaction in the repository.
+func (bld *blkDispatcher) storeTransaction(ctx context.Context, db *db.Db, trx *types.Transaction) error {
+	traceResult, err := bld.repo.TraceTransaction(trx.Hash.Hash)
+	if err != nil {
+		return err
+	}
+	if traceResult == nil || len(traceResult) == 0 {
+		return nil
+	}
+	// on first position is root transaction, if transaction failed, we don't need to process it further
+	if traceResult[0].Error != nil {
+		return nil
+	}
+
+	for _, trace := range traceResult {
+
+	}
 
 	if trx.From != nil && bld.watchedContracts[trx.From.Address] != nil {
 		trx.ProjectId = bld.watchedContracts[trx.From.Address].Id
-		return true
 	}
 	if trx.To != nil && bld.watchedContracts[trx.To.Address] != nil {
 		trx.ProjectId = bld.watchedContracts[trx.To.Address].Id
-		return true
 	}
-	// TODO: Tx tracing
+
+	total := new(big.Int).Mul(trx.GasPrice.ToInt(), new(big.Int).SetUint64(uint64(*trx.GasUsed)))
+	reward := new(big.Int).Mul(total, big.NewInt(rewardsPercentage))
+	finalReward := new(big.Int).Div(reward, big.NewInt(100))
+	trx.RewardToClaim = &types.Big{Big: hexutil.Big(*finalReward)}
+	if err := db.StoreTransaction(ctx, trx); err != nil {
+		return err
+	}
+
+	bld.repo.TraceTransaction(trx.Hash.Hash)
+
 	return false
 }
 

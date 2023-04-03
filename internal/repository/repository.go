@@ -15,7 +15,7 @@ const dbQueryTimeoutDuration = 30 * time.Second
 
 type Repository struct {
 	rpc    *rpc.Rpc
-	tracer *tracing.Tracer
+	tracer tracing.TracerInterface
 	db     *db.Db
 	log    *logger.AppLogger
 }
@@ -39,7 +39,7 @@ func New(cfg *config.Config, log *logger.AppLogger) *Repository {
 }
 
 // NewWithInstances creates a new repository from given instances.
-func NewWithInstances(db *db.Db, rpc *rpc.Rpc, tracer *tracing.Tracer, log *logger.AppLogger) *Repository {
+func NewWithInstances(db *db.Db, rpc *rpc.Rpc, tracer tracing.TracerInterface, log *logger.AppLogger) *Repository {
 	repo := Repository{
 		db:     db,
 		rpc:    rpc,

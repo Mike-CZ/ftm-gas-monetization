@@ -18,6 +18,7 @@ func (repo *Repository) Transaction(hash *common.Hash) (*types.Transaction, erro
 	return repo.rpc.Transaction(hash)
 }
 
-func (repo *Repository) TraceTransaction(hash common.Hash) {
-	repo.tracer.TraceTransaction(hash)
+// TraceTransaction returns the structured transaction traces.
+func (repo *Repository) TraceTransaction(hash common.Hash) ([]types.TransactionTrace, error) {
+	return repo.tracer.TraceTransaction(hash)
 }

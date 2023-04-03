@@ -3,8 +3,15 @@ package tracing
 import (
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
+	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
+	"github.com/ethereum/go-ethereum/common"
 	client "github.com/ethereum/go-ethereum/rpc"
 )
+
+// TracerInterface defines the interface of the TracingRpc client.
+type TracerInterface interface {
+	TraceTransaction(hash common.Hash) ([]types.TransactionTrace, error)
+}
 
 // Tracer represents the implementation of the Blockchain tracing interface for Fantom Opera node.
 type Tracer struct {

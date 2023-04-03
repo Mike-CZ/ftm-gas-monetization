@@ -9,6 +9,7 @@ import (
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/db"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/rpc"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/rpc/contracts"
+	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/tracing"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/utils"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -17,6 +18,7 @@ import (
 	eth "github.com/ethereum/go-ethereum/core/types"
 	"github.com/op/go-logging"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"log"
 	"math/big"
@@ -48,10 +50,11 @@ var (
 
 type DispatcherTestSuite struct {
 	suite.Suite
-	testChain *TestChain
-	testRpc   *rpc.Rpc
-	testDb    *db.TestDatabase
-	testRepo  *repository.Repository
+	testChain  *TestChain
+	testRpc    *rpc.Rpc
+	mockTracer *tracing.TracerMock
+	testDb     *db.TestDatabase
+	testRepo   *repository.Repository
 	// gas monetization contract and sessions
 	gasMonetizationAddr    common.Address
 	gasMonetization        *contracts.GasMonetization
@@ -81,10 +84,10 @@ func (s *DispatcherTestSuite) SetupSuite() {
 	testLogger := logger.New(log.Writer(), "test", logging.ERROR)
 	// initialize dependencies
 	s.testChain = SetupTestChain(testLogger)
-	r, t := s.testChain.SetupTestRpc(s.gasMonetizationAddr, testLogger)
-	s.testRpc = r
+	s.testRpc = s.testChain.SetupTestRpc(s.gasMonetizationAddr, testLogger)
+	s.mockTracer = new(tracing.TracerMock)
 	s.testDb = db.SetupTestDatabase(testLogger)
-	s.testRepo = repository.NewWithInstances(s.testDb.Db, s.testRpc, t, testLogger)
+	s.testRepo = repository.NewWithInstances(s.testDb.Db, s.testRpc, s.mockTracer, testLogger)
 	// initialize mock server to serve metadata
 	s.initializeMockServer()
 	// initialize block dispatcher
@@ -120,6 +123,8 @@ func (s *DispatcherTestSuite) SetupTest() {
 	s.blkDispatcher.init()
 	// shift epoch by one by beginning of the test
 	s.shiftEpochs(s.currentEpoch + 1)
+	// initialize tracer mock to always return empty traces by default
+	s.mockTracer.On("TraceTransaction", mock.Anything).Return(nil, nil)
 }
 
 // TearDownTest tears down the test
