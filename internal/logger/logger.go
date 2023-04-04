@@ -48,7 +48,7 @@ func New(out io.Writer, module string, lvl logging.Level) *AppLogger {
 	return &AppLogger{Logger: *l}
 }
 
-// New provides pre-configured Logger with stderr output and leveled filtering.
+// NewLoggerForApi provides pre-configured Logger with stderr output and leveled filtering.
 // Modules are not supported at the moment, but may be added in the future to make the logging setup more granular.
 func NewLoggerForApi(cfg *config.Config) AppLogger {
 	// Prep the backend for exporting the log records

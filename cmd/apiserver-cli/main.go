@@ -1,4 +1,4 @@
-// Package main defines the Gas Monetization CLI entry point
+// Package main defines the Gas Monetization API CLI entry point
 package main
 
 import (

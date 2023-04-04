@@ -1,4 +1,4 @@
-// Package gas_monetization implements executable entry points to the gas monetization api.
+// Package apiserver implements executable entry points to the gas monetization api.
 package apiserver
 
 import (
