@@ -9,6 +9,7 @@ import (
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/db"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/rpc"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/rpc/contracts"
+	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/tracing"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/utils"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -17,6 +18,7 @@ import (
 	eth "github.com/ethereum/go-ethereum/core/types"
 	"github.com/op/go-logging"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"log"
 	"math/big"
@@ -48,10 +50,11 @@ var (
 
 type DispatcherTestSuite struct {
 	suite.Suite
-	testChain *TestChain
-	testRpc   *rpc.Rpc
-	testDb    *db.TestDatabase
-	testRepo  *repository.Repository
+	testChain  *TestChain
+	testRpc    *rpc.Rpc
+	mockTracer *tracing.TracerMock
+	testDb     *db.TestDatabase
+	testRepo   *repository.Repository
 	// gas monetization contract and sessions
 	gasMonetizationAddr    common.Address
 	gasMonetization        *contracts.GasMonetization
@@ -82,8 +85,9 @@ func (s *DispatcherTestSuite) SetupSuite() {
 	// initialize dependencies
 	s.testChain = SetupTestChain(testLogger)
 	s.testRpc = s.testChain.SetupTestRpc(s.gasMonetizationAddr, testLogger)
+	s.mockTracer = new(tracing.TracerMock)
 	s.testDb = db.SetupTestDatabase(testLogger)
-	s.testRepo = repository.NewWithInstances(s.testDb.Db, s.testRpc, testLogger)
+	s.testRepo = repository.NewWithInstances(s.testDb.Db, s.testRpc, s.mockTracer, testLogger)
 	// initialize mock server to serve metadata
 	s.initializeMockServer()
 	// initialize block dispatcher
@@ -119,6 +123,8 @@ func (s *DispatcherTestSuite) SetupTest() {
 	s.blkDispatcher.init()
 	// shift epoch by one by beginning of the test
 	s.shiftEpochs(s.currentEpoch + 1)
+	// initialize tracer mock to always return empty traces by default
+	s.mockTracer.On("TraceTransaction", mock.Anything).Return([]types.TransactionTrace{}, nil)
 }
 
 // TearDownTest tears down the test
@@ -321,7 +327,6 @@ func (s *DispatcherTestSuite) TestCollectRelatedTransactions() {
 	// send 10 related transactions
 	for i := 0; i < 10; i++ {
 		s.sendTransaction(s.testChain.FunderAcc, projectContracts[0].Address, big.NewInt(1_000))
-		s.processBlock(s.getLatestBlock())
 	}
 	tq := s.testRepo.TransactionQuery()
 	transactions, err := tq.GetAll()
@@ -330,7 +335,6 @@ func (s *DispatcherTestSuite) TestCollectRelatedTransactions() {
 	// send 10 unrelated transactions
 	for i := 0; i < 10; i++ {
 		s.sendTransaction(s.testChain.FunderAcc, s.testChain.ProjectOwnerAcc.Address, big.NewInt(1_000))
-		s.processBlock(s.getLatestBlock())
 	}
 	transactions, err = tq.GetAll()
 	assert.Nil(s.T(), err)
@@ -344,7 +348,6 @@ func (s *DispatcherTestSuite) TestAddingContractWillCollectTransactions() {
 	// send 10 transactions
 	for i := 0; i < 10; i++ {
 		s.sendTransaction(s.testChain.FunderAcc, addr, big.NewInt(1_000))
-		s.processBlock(s.getLatestBlock())
 	}
 	// verify that no transactions were collected
 	tq := s.testRepo.TransactionQuery()
@@ -358,7 +361,6 @@ func (s *DispatcherTestSuite) TestAddingContractWillCollectTransactions() {
 	// send 10 transactions
 	for i := 0; i < 10; i++ {
 		s.sendTransaction(s.testChain.FunderAcc, addr, big.NewInt(1_000))
-		s.processBlock(s.getLatestBlock())
 	}
 	// verify that transactions were collected
 	transactions, err = tq.GetAll()
@@ -382,7 +384,6 @@ func (s *DispatcherTestSuite) TestAddingContractForSuspendedProjectWontCollectTr
 	// send 10 transactions
 	for i := 0; i < 10; i++ {
 		s.sendTransaction(s.testChain.FunderAcc, addr, big.NewInt(1_000))
-		s.processBlock(s.getLatestBlock())
 	}
 	// verify that no transactions were collected
 	tq := s.testRepo.TransactionQuery()
@@ -396,7 +397,6 @@ func (s *DispatcherTestSuite) TestAddingContractForSuspendedProjectWontCollectTr
 	// send 10 transactions
 	for i := 0; i < 10; i++ {
 		s.sendTransaction(s.testChain.FunderAcc, addr, big.NewInt(1_000))
-		s.processBlock(s.getLatestBlock())
 	}
 	// verify that transactions were collected
 	transactions, err = tq.GetAll()
@@ -410,7 +410,6 @@ func (s *DispatcherTestSuite) TestDeletingContractWontCollectTransactions() {
 	// send 10 transactions
 	for i := 0; i < 10; i++ {
 		s.sendTransaction(s.testChain.FunderAcc, projectContracts[0].Address, big.NewInt(1_000))
-		s.processBlock(s.getLatestBlock())
 	}
 	// verify that transactions were collected
 	tq := s.testRepo.TransactionQuery()
@@ -424,7 +423,6 @@ func (s *DispatcherTestSuite) TestDeletingContractWontCollectTransactions() {
 	// send 10 transactions
 	for i := 0; i < 10; i++ {
 		s.sendTransaction(s.testChain.FunderAcc, projectContracts[0].Address, big.NewInt(1_000))
-		s.processBlock(s.getLatestBlock())
 	}
 	// verify that no transactions were collected
 	transactions, err = tq.GetAll()
@@ -448,7 +446,6 @@ func (s *DispatcherTestSuite) TestAmountToWithdrawIsCalculatedCorrectly() {
 	// send 10 transactions
 	for i := 0; i < 10; i++ {
 		s.sendTransaction(s.testChain.FunderAcc, projectContracts[0].Address, big.NewInt(1_000))
-		s.processBlock(s.getLatestBlock())
 	}
 	// shift epoch and send transaction to trigger rewards calculation
 	s.shiftEpochs(10)
@@ -474,7 +471,6 @@ func (s *DispatcherTestSuite) TestNumberOfTransactionsIsStoredCorrectly() {
 	// send 10 transactions
 	for i := 0; i < 10; i++ {
 		s.sendTransaction(s.testChain.FunderAcc, projectContracts[0].Address, big.NewInt(1_000))
-		s.processBlock(s.getLatestBlock())
 	}
 	// shift epoch and send transaction to trigger rewards calculation
 	s.shiftEpochs(10)
@@ -501,7 +497,6 @@ func (s *DispatcherTestSuite) TestWithdrawal() {
 	// send 10 transactions
 	for i := 0; i < 10; i++ {
 		s.sendTransaction(s.testChain.FunderAcc, projectContracts[0].Address, big.NewInt(1_000))
-		s.processBlock(s.getLatestBlock())
 	}
 	// assert we have 10 related transactions
 	tq := s.testRepo.TransactionQuery()
@@ -582,6 +577,26 @@ func (s *DispatcherTestSuite) sendTransaction(from *testAccount, to common.Addre
 	assert.Nil(s.T(), err)
 	err = s.testChain.RawRpc.SendTransaction(context.Background(), signedTx)
 	assert.Nil(s.T(), err)
+	// we need to unset previously unset anything matcher, because this specific won't get called
+	s.mockTracer.ExpectedCalls = nil
+	// mock transaction data to be processed by the tracer
+	gasUsed := hexutil.Uint64(21_000)
+	s.mockTracer.On("TraceTransaction", mock.Anything).Return([]types.TransactionTrace{
+		{
+			Action: &types.TransactionTraceAction{
+				From: &from.Address,
+				To:   &to,
+			},
+			Result: &types.TransactionTraceResult{
+				GasUsed: &gasUsed,
+			},
+		},
+	}, nil)
+	// process the latest block
+	s.processBlock(s.getLatestBlock())
+	// reset mock value back
+	s.mockTracer.ExpectedCalls = nil
+	s.mockTracer.On("TraceTransaction", mock.Anything).Return([]types.TransactionTrace{}, nil)
 }
 
 // initializeGasMonetizationSessions initializes sessions for the test accounts

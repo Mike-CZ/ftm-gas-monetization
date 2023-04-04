@@ -21,12 +21,6 @@ func run(ctx *cli.Context) error {
 	cfg := config.Load(ctx)
 	app.Bootstrap(ctx, cfg)
 	app.Start()
-	//res, err := app.Repository().BlockByNumber(nil)
-	//if err != nil {
-	//	fmt.Println(err)
-	//	return nil
-	//}
-	//fmt.Println(res.Number.String())
 
 	return nil
 }
