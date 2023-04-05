@@ -1,10 +1,8 @@
 package logger
 
 import (
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
 	"github.com/op/go-logging"
 	"io"
-	"os"
 	"strings"
 )
 
@@ -46,29 +44,4 @@ func New(out io.Writer, module string, lvl logging.Level) *AppLogger {
 	l := logging.MustGetLogger(module)
 
 	return &AppLogger{Logger: *l}
-}
-
-// NewLoggerForApi provides pre-configured Logger with stderr output and leveled filtering.
-// Modules are not supported at the moment, but may be added in the future to make the logging setup more granular.
-func NewLoggerForApi(cfg *config.Config) AppLogger {
-	// Prep the backend for exporting the log records
-	backend := logging.NewLogBackend(os.Stderr, "", 0)
-
-	// Parse log format from configuration and apply it to the backend
-	format := logging.MustStringFormatter(cfg.Logger.LogFormat)
-	fmtBackend := logging.NewBackendFormatter(backend, format)
-
-	// Parse and apply the configured level on which the recording will be emitted
-	level, err := logging.LogLevel(cfg.Logger.LoggingLevel.String())
-	if err != nil {
-		level = logging.INFO
-	}
-	lvlBackend := logging.AddModuleLevel(fmtBackend)
-	lvlBackend.SetLevel(level, "")
-
-	// assign the backend and return the new logger
-	logging.SetBackend(lvlBackend)
-	l := logging.MustGetLogger(cfg.AppName)
-
-	return AppLogger{*l}
 }

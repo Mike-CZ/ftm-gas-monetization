@@ -20,8 +20,8 @@ var CmdRun = cli.Command{
 
 func run(ctx *cli.Context) error {
 	cfg := config.Load(ctx)
-	log := logger.NewLoggerForApi(cfg)
-	api.New(cfg, &log)
+	log := logger.New(ctx.App.Writer, ctx.App.HelpName, cfg.Logger.LoggingLevel)
+	api.New(cfg, log)
 
 	return nil
 }

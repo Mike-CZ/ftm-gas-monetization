@@ -71,26 +71,9 @@ func R() *Repository {
 
 	// make sure to instantiate the Repository only once
 	oneInstance.Do(func() {
-		instance = newProxy()
+		instance = New(cfg, log)
 	})
 	return instance
-}
-
-// newProxy creates new instance of Proxy, implementing the Repository interface.
-func newProxy() *Repository {
-	// make Proxy instance
-	p := Repository{
-		db:  db.New(&cfg.DB, log),
-		log: log,
-	}
-
-	if p.db == nil {
-		log.Panicf("repository init failed")
-		return nil
-	}
-
-	log.Notice("repository ready")
-	return &p
 }
 
 // NewWithInstances creates a new repository from given instances.
