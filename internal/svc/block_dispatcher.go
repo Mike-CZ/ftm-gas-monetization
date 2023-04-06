@@ -263,14 +263,13 @@ func (bld *blkDispatcher) storeTransaction(ctx context.Context, db *db.Db, trx *
 		// set total gas used for given transaction
 		gasMap[trace.StringPath()] = trace.Result.GasUsed
 		// check whether we are interested in this transaction
-		projectId := bld.getProjectId(&trace)
-		// if project id is nil, we are not interested in this transaction
-		if projectId == nil {
-			continue
+		// we are only interested in receiver address
+		if bld.watchedContracts[*trace.Action.To] == nil {
+			return nil
 		}
 		// create new transaction
 		t := &types.Transaction{
-			ProjectId:   *projectId,
+			ProjectId:   bld.watchedContracts[*trace.Action.To].Id,
 			Hash:        trx.Hash,
 			BlockHash:   trx.BlockHash,
 			BlockNumber: trx.BlockNumber,
@@ -297,18 +296,6 @@ func (bld *blkDispatcher) storeTransaction(ctx context.Context, db *db.Db, trx *
 			return err
 		}
 	}
-	return nil
-}
-
-// getProjectId returns project id for given transaction trace.
-func (bld *blkDispatcher) getProjectId(trace *types.TransactionTrace) *int64 {
-	if bld.watchedContracts[*trace.Action.To] != nil {
-		return &bld.watchedContracts[*trace.Action.To].Id
-	}
-	if bld.watchedContracts[*trace.Action.From] != nil {
-		return &bld.watchedContracts[*trace.Action.From].Id
-	}
-	// TODO: what if from and to are both watched contracts from different projects?
 	return nil
 }
 
