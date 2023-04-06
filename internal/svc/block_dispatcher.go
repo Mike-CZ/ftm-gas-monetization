@@ -75,8 +75,14 @@ func (bld *blkDispatcher) execute() {
 			}
 			// process the new block
 			bld.log.Debugf("block #%d arrived", uint64(blk.Number))
-			if !bld.process(blk) {
-				continue
+
+			// we have to be sure, that all blocks are processed
+			isProcessed := false
+			for !isProcessed {
+				if isProcessed = bld.process(blk); !isProcessed {
+					bld.log.Criticalf("failed to process block #%d, retrying in 5 seconds", uint64(blk.Number))
+					time.Sleep(5 * time.Second)
+				}
 			}
 		}
 	}
