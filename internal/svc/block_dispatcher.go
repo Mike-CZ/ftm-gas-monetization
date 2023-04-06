@@ -4,8 +4,8 @@ package svc
 import (
 	"context"
 	"fmt"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/db"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
+	"ftm-gas-monetization/internal/repository/db"
+	"ftm-gas-monetization/internal/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"math/big"

@@ -1,9 +1,9 @@
 package gas_monetization
 
 import (
-	"github.com/Mike-CZ/ftm-gas-monetization/cmd/gas-monetization-cli/flags"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/app"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
+	"ftm-gas-monetization/cmd/gas-monetization-cli/flags"
+	"ftm-gas-monetization/internal/app"
+	"ftm-gas-monetization/internal/config"
 	"github.com/urfave/cli/v2"
 )
 

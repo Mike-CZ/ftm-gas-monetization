@@ -2,7 +2,7 @@
 package main
 
 import (
-	"github.com/Mike-CZ/ftm-gas-monetization/cmd/gas-monetization-cli/gas-monetization"
+	"ftm-gas-monetization/cmd/gas-monetization-cli/gas-monetization"
 	"github.com/urfave/cli/v2"
 	"log"
 	"os"

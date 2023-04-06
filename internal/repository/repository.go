@@ -2,11 +2,11 @@ package repository
 
 import (
 	"context"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/db"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/rpc"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/tracing"
+	"ftm-gas-monetization/internal/config"
+	"ftm-gas-monetization/internal/logger"
+	"ftm-gas-monetization/internal/repository/db"
+	"ftm-gas-monetization/internal/repository/rpc"
+	"ftm-gas-monetization/internal/repository/tracing"
 	"time"
 )
 

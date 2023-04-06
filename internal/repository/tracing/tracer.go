@@ -1,9 +1,9 @@
 package tracing
 
 import (
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
+	"ftm-gas-monetization/internal/config"
+	"ftm-gas-monetization/internal/logger"
+	"ftm-gas-monetization/internal/types"
 	"github.com/ethereum/go-ethereum/common"
 	client "github.com/ethereum/go-ethereum/rpc"
 )

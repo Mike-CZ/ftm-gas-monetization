@@ -1,4 +1,4 @@
-module github.com/Mike-CZ/ftm-gas-monetization
+module ftm-gas-monetization
 
 go 1.20
 
