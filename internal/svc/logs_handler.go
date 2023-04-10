@@ -63,9 +63,6 @@ func (bld *blkDispatcher) handleProjectAdded(ctx context.Context, log *eth.Log, 
 		ActiveToEpoch:       nil,
 	}
 	if err = setMetadata(project); err != nil {
-		// set empty strings on failure
-		project.Name = ""
-		project.ImageUrl = ""
 		bld.log.Criticalf("failed to set metadata for project #%d: %v", project.ProjectId, err)
 	}
 	// store project
@@ -349,7 +346,9 @@ func (bld *blkDispatcher) handleWithdrawalRequest(ctx context.Context, log *eth.
 		return nil
 	}
 	if err = bld.repo.CompleteWithdrawal(project.ProjectId, epoch, project.RewardsToClaim.ToInt()); err != nil {
-		bld.log.Criticalf("failed to complete withdrawal for project #%d: %v", project.ProjectId, err)
+		bld.log.Criticalf("failed to complete withdrawal for project #%d: %s", project.ProjectId, err.Error())
+		// also send notification that withdrawal failed
+		bld.sendNotification(fmt.Sprintf("Failed to complete withdrawal for project #%d: %s", project.ProjectId, err.Error()))
 	}
 	return nil
 }
