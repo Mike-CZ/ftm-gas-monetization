@@ -4,8 +4,9 @@ package svc
 import (
 	"context"
 	"fmt"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/db"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
+	"ftm-gas-monetization/internal/notifier"
+	"ftm-gas-monetization/internal/repository/db"
+	"ftm-gas-monetization/internal/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"math/big"
@@ -18,6 +19,7 @@ const rewardsPercentage = 15
 // blkDispatcher implements a service responsible for processing new blocks on the blockchain.
 type blkDispatcher struct {
 	service
+	notifier      notifier.Notifier
 	inBlock       chan *types.Block
 	outDispatched chan uint64
 	// topics represents a map of topics to their respective event handlers.
@@ -75,8 +77,14 @@ func (bld *blkDispatcher) execute() {
 			}
 			// process the new block
 			bld.log.Debugf("block #%d arrived", uint64(blk.Number))
-			if !bld.process(blk) {
-				continue
+
+			// we have to be sure, that all blocks are processed
+			isProcessed := false
+			for !isProcessed {
+				if isProcessed = bld.process(blk); !isProcessed {
+					bld.log.Criticalf("failed to process block #%d, retrying in 5 seconds", uint64(blk.Number))
+					time.Sleep(5 * time.Second)
+				}
 			}
 		}
 	}
@@ -117,16 +125,10 @@ func (bld *blkDispatcher) processTxs(blk *types.Block) bool {
 					return fmt.Errorf("failed to store previous epoch: %s", err.Error())
 				}
 			}
-			// set epoch id for the transaction
+			// store transaction into database
 			trx.Epoch = blk.Epoch
-			if bld.checkContractAndFillProjectId(trx) {
-				total := new(big.Int).Mul(trx.GasPrice.ToInt(), new(big.Int).SetUint64(uint64(*trx.GasUsed)))
-				reward := new(big.Int).Mul(total, big.NewInt(rewardsPercentage))
-				finalReward := new(big.Int).Div(reward, big.NewInt(100))
-				trx.RewardToClaim = &types.Big{Big: hexutil.Big(*finalReward)}
-				if err := db.StoreTransaction(ctx, trx); err != nil {
-					return err
-				}
+			if err := bld.storeTransaction(ctx, db, trx); err != nil {
+				return fmt.Errorf("failed to store transaction: %s", err.Error())
 			}
 			// process logs
 			if trx.Logs != nil && len(trx.Logs) > 0 {
@@ -233,18 +235,76 @@ func (bld *blkDispatcher) storePreviousEpoch(ctx context.Context, db *db.Db, new
 	return nil
 }
 
-// checkContractAndFillProjectId checks if the transaction is related to a contract and fills the project id.
-func (bld *blkDispatcher) checkContractAndFillProjectId(trx *types.Transaction) bool {
-	if trx.From != nil && bld.watchedContracts[trx.From.Address] != nil {
-		trx.ProjectId = bld.watchedContracts[trx.From.Address].Id
-		return true
+// storeTransaction stores a transaction in the repository.
+func (bld *blkDispatcher) storeTransaction(ctx context.Context, db *db.Db, trx *types.Transaction) error {
+	traceResult, err := bld.repo.TraceTransaction(trx.Hash.Hash)
+	if err != nil {
+		return err
 	}
-	if trx.To != nil && bld.watchedContracts[trx.To.Address] != nil {
-		trx.ProjectId = bld.watchedContracts[trx.To.Address].Id
-		return true
+	if traceResult == nil || len(traceResult) == 0 {
+		return nil
 	}
-	// TODO: Tx tracing
-	return false
+	// map for storing gas used for each transaction
+	gasMap := make(map[string]*hexutil.Uint64)
+	// list of transactions to be stored
+	var transactions []*types.Transaction
+
+	// we need to iterate over all traces and subtract gas used from parents
+	// currently each transaction contains gas used for all sub-calls
+	for _, trace := range traceResult {
+		// if error occurred, skip
+		if trace.Error != nil {
+			continue
+		}
+		// get parent path
+		parent := trace.ParentStringPath()
+		// if parent exists, subtract gas used from parent
+		if parent != nil {
+			gas, exists := gasMap[*parent]
+			// if parent does not exist, skip (error occurred in parent)
+			if !exists {
+				continue
+			}
+			// set new gas used for parent, so we keep pointer to the same value
+			*gas = hexutil.Uint64(uint64(*gas) - uint64(*trace.Result.GasUsed))
+		}
+		// set total gas used for given transaction
+		gasMap[trace.StringPath()] = trace.Result.GasUsed
+		// check whether we are interested in this transaction
+		// we are only interested in receiver address
+		if bld.watchedContracts[*trace.Action.To] == nil {
+			return nil
+		}
+		// create new transaction
+		t := &types.Transaction{
+			ProjectId:   bld.watchedContracts[*trace.Action.To].Id,
+			Hash:        trx.Hash,
+			BlockHash:   trx.BlockHash,
+			BlockNumber: trx.BlockNumber,
+			Epoch:       trx.Epoch,
+			Timestamp:   trx.Timestamp,
+			From:        &types.Address{Address: *trace.Action.From},
+			To:          &types.Address{Address: *trace.Action.To},
+			GasUsed:     gasMap[trace.StringPath()],
+			GasPrice:    trx.GasPrice,
+		}
+		// add transaction to the list
+		transactions = append(transactions, t)
+	}
+
+	// store all transactions
+	for _, t := range transactions {
+		// do final reward calculation on final gas amounts
+		total := new(big.Int).Mul(t.GasPrice.ToInt(), new(big.Int).SetUint64(uint64(*t.GasUsed)))
+		reward := new(big.Int).Mul(total, big.NewInt(rewardsPercentage))
+		finalReward := new(big.Int).Div(reward, big.NewInt(100))
+		t.RewardToClaim = &types.Big{Big: hexutil.Big(*finalReward)}
+		// store transaction
+		if err := db.StoreTransaction(ctx, t); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // load a transaction detail from repository, if possible.
@@ -267,6 +327,17 @@ func (bld *blkDispatcher) initializeCurrentEpoch() {
 		bld.log.Fatal("failed to get current epoch: %v", err)
 	}
 	bld.currentEpochId = epoch
+}
+
+// sendNotification sends a notification.
+func (bld *blkDispatcher) sendNotification(message string) {
+	if bld.notifier == nil {
+		bld.log.Warningf("no notifier configured, cannot send notification: %s", message)
+		return
+	}
+	if err := bld.notifier.SendNotification(message); err != nil {
+		bld.log.Errorf("failed to send notification: %v", err)
+	}
 }
 
 // initializeProjects initializes the list of watched projects.

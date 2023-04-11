@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/Mike-CZ/ftm-gas-monetization/cmd/gas-monetization-cli/flags"
+	"ftm-gas-monetization/cmd/gas-monetization-cli/flags"
 	"github.com/spf13/viper"
 	"github.com/urfave/cli/v2"
 	"log"

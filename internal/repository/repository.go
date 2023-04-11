@@ -6,7 +6,6 @@ import (
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/db"
 	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/rpc"
-	"sync"
 	"time"
 )
 
@@ -14,9 +13,10 @@ import (
 const dbQueryTimeoutDuration = 30 * time.Second
 
 type Repository struct {
-	rpc *rpc.Rpc
-	db  *db.Db
-	log *logger.AppLogger
+	rpc    *rpc.Rpc
+	tracer tracing.TracerInterface
+	db     *db.Db
+	log    *logger.AppLogger
 }
 
 // config represents the configuration setup used by the repository
@@ -51,9 +51,10 @@ func SetLogger(l logger.AppLogger) {
 func New(cfg *config.Config, log *logger.AppLogger) *Repository {
 	repoLogger := log.ModuleLogger("repository")
 	repo := Repository{
-		db:  db.New(&cfg.DB, repoLogger),
-		rpc: rpc.New(&cfg.Rpc, &cfg.GasMonetization, repoLogger),
-		log: repoLogger,
+		db:     db.New(&cfg.DB, repoLogger),
+		rpc:    rpc.New(&cfg.Rpc, &cfg.GasMonetization, repoLogger),
+		tracer: tracing.New(&cfg.Rpc, repoLogger),
+		log:    repoLogger,
 	}
 
 	if repo.rpc == nil || repo.db == nil {
@@ -77,11 +78,12 @@ func R() *Repository {
 }
 
 // NewWithInstances creates a new repository from given instances.
-func NewWithInstances(db *db.Db, rpc *rpc.Rpc, log *logger.AppLogger) *Repository {
+func NewWithInstances(db *db.Db, rpc *rpc.Rpc, tracer tracing.TracerInterface, log *logger.AppLogger) *Repository {
 	repo := Repository{
-		db:  db,
-		rpc: rpc,
-		log: log,
+		db:     db,
+		rpc:    rpc,
+		tracer: tracer,
+		log:    log,
 	}
 	return &repo
 }

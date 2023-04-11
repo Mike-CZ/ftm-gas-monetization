@@ -2,7 +2,7 @@ package repository
 
 import (
 	"context"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/db"
+	"ftm-gas-monetization/internal/repository/db"
 )
 
 // ProjectContractQuery returns a new project contract query builder.

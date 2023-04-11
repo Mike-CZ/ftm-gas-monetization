@@ -2,8 +2,8 @@ package repository
 
 import (
 	"context"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository/db"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
+	"ftm-gas-monetization/internal/repository/db"
+	"ftm-gas-monetization/internal/types"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -16,4 +16,9 @@ func (repo *Repository) TransactionQuery() db.TransactionQueryBuilder {
 // If the transaction is not found, ErrTransactionNotFound error is returned.
 func (repo *Repository) Transaction(hash *common.Hash) (*types.Transaction, error) {
 	return repo.rpc.Transaction(hash)
+}
+
+// TraceTransaction returns the structured transaction traces.
+func (repo *Repository) TraceTransaction(hash common.Hash) ([]types.TransactionTrace, error) {
+	return repo.tracer.TraceTransaction(hash)
 }

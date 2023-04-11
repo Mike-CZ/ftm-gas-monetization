@@ -1,9 +1,9 @@
 package gas_monetization
 
 import (
-	"github.com/Mike-CZ/ftm-gas-monetization/cmd/gas-monetization-cli/flags"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/app"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
+	"ftm-gas-monetization/cmd/gas-monetization-cli/flags"
+	"ftm-gas-monetization/internal/app"
+	"ftm-gas-monetization/internal/config"
 	"github.com/urfave/cli/v2"
 )
 
@@ -21,12 +21,6 @@ func run(ctx *cli.Context) error {
 	cfg := config.Load(ctx)
 	app.Bootstrap(ctx, cfg)
 	app.Start()
-	//res, err := app.Repository().BlockByNumber(nil)
-	//if err != nil {
-	//	fmt.Println(err)
-	//	return nil
-	//}
-	//fmt.Println(res.Number.String())
 
 	return nil
 }

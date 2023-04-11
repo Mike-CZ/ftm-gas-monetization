@@ -1,8 +1,8 @@
 package svc
 
 import (
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository"
+	"ftm-gas-monetization/internal/logger"
+	"ftm-gas-monetization/internal/repository"
 )
 
 // serviceHandler represents a service run by the Manager.

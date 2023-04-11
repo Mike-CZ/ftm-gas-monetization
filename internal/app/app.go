@@ -1,10 +1,10 @@
 package app
 
 import (
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/svc"
+	"ftm-gas-monetization/internal/config"
+	"ftm-gas-monetization/internal/logger"
+	"ftm-gas-monetization/internal/repository"
+	"ftm-gas-monetization/internal/svc"
 	"github.com/urfave/cli/v2"
 	"sync"
 )
@@ -36,7 +36,7 @@ func Bootstrap(ctx *cli.Context, cfg *config.Config) {
 func Start() {
 	// start the manager
 	if instance.manager == nil {
-		instance.manager = svc.New(Repository(), instance.log)
+		instance.manager = svc.New(instance.cfg, Repository(), instance.log)
 		instance.manager.Run()
 	}
 }

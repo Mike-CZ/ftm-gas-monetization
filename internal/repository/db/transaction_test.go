@@ -2,7 +2,7 @@ package db
 
 import (
 	"context"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
+	"ftm-gas-monetization/internal/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/assert"

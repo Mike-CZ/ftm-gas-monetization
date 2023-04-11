@@ -10,6 +10,7 @@ type Config struct {
 	Api             ApiServer
 	Logger          Logging
 	GasMonetization GasMonetization
+	Slack           Slack
 	AppName         string
 }
 
@@ -48,4 +49,10 @@ type ApiServer struct {
 type Logging struct {
 	LoggingLevel logging.Level
 	LogFormat    string
+}
+
+// Slack is a configuration for Slack notifications.
+type Slack struct {
+	Token     string
+	ChannelId string
 }

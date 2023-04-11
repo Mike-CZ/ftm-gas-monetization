@@ -3,7 +3,7 @@ package gas_monetization
 
 import (
 	"encoding/json"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
+	"ftm-gas-monetization/internal/config"
 	"github.com/urfave/cli/v2"
 )
 
