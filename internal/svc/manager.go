@@ -1,13 +1,16 @@
 package svc
 
 import (
+	"ftm-gas-monetization/internal/config"
 	"ftm-gas-monetization/internal/logger"
+	"ftm-gas-monetization/internal/notifier"
 	"ftm-gas-monetization/internal/repository"
 	"sync"
 )
 
 // Manager represents the manager controlling services lifetime.
 type Manager struct {
+	cfg  *config.Config
 	repo *repository.Repository
 	wg   *sync.WaitGroup
 	svc  []serviceHandler
@@ -18,9 +21,10 @@ type Manager struct {
 	blkDispatcher *blkDispatcher
 }
 
-func New(repo *repository.Repository, log *logger.AppLogger) *Manager {
+func New(cfg *config.Config, repo *repository.Repository, log *logger.AppLogger) *Manager {
 	// prep the manager
 	mgr := Manager{
+		cfg:  cfg,
 		repo: repo,
 		wg:   new(sync.WaitGroup),
 		svc:  make([]serviceHandler, 0),
@@ -81,6 +85,7 @@ func (mgr *Manager) init() {
 			log:  mgr.log.ModuleLogger("blk_scanner"),
 			mgr:  mgr,
 		},
+		notifier: notifier.NewSlackNotifier(mgr.cfg.Slack.Token, mgr.cfg.Slack.ChannelId),
 	}
 	mgr.svc = append(mgr.svc, mgr.blkDispatcher)
 }

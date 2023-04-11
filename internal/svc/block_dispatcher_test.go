@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"ftm-gas-monetization/internal/config"
 	"ftm-gas-monetization/internal/logger"
+	"ftm-gas-monetization/internal/notifier"
 	"ftm-gas-monetization/internal/repository"
 	"ftm-gas-monetization/internal/repository/db"
 	"ftm-gas-monetization/internal/repository/rpc"
@@ -95,9 +97,12 @@ func (s *DispatcherTestSuite) SetupSuite() {
 		service: service{
 			repo: s.testRepo,
 			log:  testLogger,
-			mgr:  New(s.testRepo, testLogger),
+			mgr:  New(&config.Config{}, s.testRepo, testLogger),
 		},
 	}
+	nm := new(notifier.MockNotifier)
+	nm.On("SendNotification", mock.Anything).Return(nil)
+	s.blkDispatcher.notifier = nm
 	s.blkDispatcher.init()
 	// make channel for receiving blocks
 	s.blkDispatcher.inBlock = make(chan *types.Block)

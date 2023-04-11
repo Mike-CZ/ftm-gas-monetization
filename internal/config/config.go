@@ -8,6 +8,7 @@ type Config struct {
 	DB              DB
 	Rpc             Rpc
 	GasMonetization GasMonetization
+	Slack           Slack
 	LoggingLevel    logging.Level
 }
 
@@ -30,4 +31,10 @@ type DB struct {
 	Host     string
 	Port     string
 	Name     string
+}
+
+// Slack is a configuration for Slack notifications.
+type Slack struct {
+	Token     string
+	ChannelId string
 }

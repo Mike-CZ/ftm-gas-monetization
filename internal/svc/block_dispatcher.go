@@ -4,6 +4,7 @@ package svc
 import (
 	"context"
 	"fmt"
+	"ftm-gas-monetization/internal/notifier"
 	"ftm-gas-monetization/internal/repository/db"
 	"ftm-gas-monetization/internal/types"
 	"github.com/ethereum/go-ethereum/common"
@@ -18,6 +19,7 @@ const rewardsPercentage = 15
 // blkDispatcher implements a service responsible for processing new blocks on the blockchain.
 type blkDispatcher struct {
 	service
+	notifier      notifier.Notifier
 	inBlock       chan *types.Block
 	outDispatched chan uint64
 	// topics represents a map of topics to their respective event handlers.
@@ -325,6 +327,17 @@ func (bld *blkDispatcher) initializeCurrentEpoch() {
 		bld.log.Fatal("failed to get current epoch: %v", err)
 	}
 	bld.currentEpochId = epoch
+}
+
+// sendNotification sends a notification.
+func (bld *blkDispatcher) sendNotification(message string) {
+	if bld.notifier == nil {
+		bld.log.Warningf("no notifier configured, cannot send notification: %s", message)
+		return
+	}
+	if err := bld.notifier.SendNotification(message); err != nil {
+		bld.log.Errorf("failed to send notification: %v", err)
+	}
 }
 
 // initializeProjects initializes the list of watched projects.

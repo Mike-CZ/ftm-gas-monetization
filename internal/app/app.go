@@ -36,7 +36,7 @@ func Bootstrap(ctx *cli.Context, cfg *config.Config) {
 func Start() {
 	// start the manager
 	if instance.manager == nil {
-		instance.manager = svc.New(Repository(), instance.log)
+		instance.manager = svc.New(instance.cfg, Repository(), instance.log)
 		instance.manager.Run()
 	}
 }
