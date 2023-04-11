@@ -1,4 +1,4 @@
-module github.com/Mike-CZ/ftm-gas-monetization
+module ftm-gas-monetization
 
 go 1.20
 
@@ -10,8 +10,8 @@ require (
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lib/pq v1.10.0
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
-	github.com/slack-go/slack v0.12.1
 	github.com/rs/cors v1.7.0
+	github.com/slack-go/slack v0.12.1
 	github.com/spf13/viper v1.15.0
 	github.com/stretchr/testify v1.8.2
 	github.com/testcontainers/testcontainers-go v0.18.0
@@ -98,6 +98,7 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/status-im/keycard-go v0.2.0 // indirect
+	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	github.com/tklauser/go-sysconf v0.3.5 // indirect

@@ -1,8 +1,8 @@
 package resolvers
 
 import (
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/types"
+	"ftm-gas-monetization/internal/repository"
+	"ftm-gas-monetization/internal/types"
 	"github.com/ethereum/go-ethereum/graphql"
 )
 

@@ -1,10 +1,10 @@
 package apiserver
 
 import (
-	"github.com/Mike-CZ/ftm-gas-monetization/cmd/gas-monetization-cli/flags"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/api"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
+	"ftm-gas-monetization/cmd/gas-monetization-cli/flags"
+	"ftm-gas-monetization/internal/api"
+	"ftm-gas-monetization/internal/config"
+	"ftm-gas-monetization/internal/logger"
 	"github.com/urfave/cli/v2"
 )
 

@@ -3,8 +3,8 @@ package resolvers
 
 import (
 	"fmt"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
+	"ftm-gas-monetization/internal/config"
+	"ftm-gas-monetization/internal/logger"
 	"sync"
 )
 

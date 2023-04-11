@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
+	"ftm-gas-monetization/internal/logger"
 	"html/template"
 	"net/http"
 )

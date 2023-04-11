@@ -1,11 +1,11 @@
 package api
 
 import (
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/graphql/resolvers"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/handlers"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/repository"
+	"ftm-gas-monetization/internal/config"
+	"ftm-gas-monetization/internal/graphql/resolvers"
+	"ftm-gas-monetization/internal/handlers"
+	"ftm-gas-monetization/internal/logger"
+	"ftm-gas-monetization/internal/repository"
 	"net/http"
 	"time"
 )

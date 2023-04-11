@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/config"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/graphql/resolvers"
-	gqlSchema "github.com/Mike-CZ/ftm-gas-monetization/internal/graphql/schema"
-	"github.com/Mike-CZ/ftm-gas-monetization/internal/logger"
+	"ftm-gas-monetization/internal/config"
+	"ftm-gas-monetization/internal/graphql/resolvers"
+	gqlSchema "ftm-gas-monetization/internal/graphql/schema"
+	"ftm-gas-monetization/internal/logger"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/graph-gophers/graphql-go/relay"
 	"github.com/graph-gophers/graphql-transport-ws/graphqlws"

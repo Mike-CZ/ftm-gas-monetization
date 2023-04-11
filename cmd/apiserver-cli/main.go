@@ -2,7 +2,7 @@
 package main
 
 import (
-	"github.com/Mike-CZ/ftm-gas-monetization/cmd/apiserver-cli/apiserver"
+	"ftm-gas-monetization/cmd/apiserver-cli/apiserver"
 	"github.com/urfave/cli/v2"
 	"log"
 	"os"

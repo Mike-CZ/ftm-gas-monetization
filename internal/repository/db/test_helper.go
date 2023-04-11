@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"ftm-gas-monetization/internal/config"
 	"ftm-gas-monetization/internal/logger"
+	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"time"
-
-	"github.com/testcontainers/testcontainers-go"
 )
 
 const (
