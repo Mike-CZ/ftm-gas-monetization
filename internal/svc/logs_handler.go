@@ -31,6 +31,7 @@ func (bld *blkDispatcher) initializeTopics() {
 		common.HexToHash("0xffc579e983741c17a95792c458e2ae8c933b1bf7f5cd84f3bca571505c25d42a"): bld.handleProjectOwnerUpdated,
 		common.HexToHash("0x6b19bb08027e5bee64cbe3f99bbbfb671c0e134643993f0ad046fd01d020b342"): bld.handleWithdrawalRequest,
 		common.HexToHash("0x709b466596e79834da0e8ee56d4624cb3e8464a18cd5ae894790b672594c402c"): bld.handleWithdrawalCompleted,
+		common.HexToHash("0xe13f2d157714b016f2b9ff3d2db5002bca0925cf357170d6ab0bd1867ce6880b"): bld.handleInvalidWithdrawalAmount,
 	}
 }
 
@@ -418,6 +419,26 @@ func (bld *blkDispatcher) handleWithdrawalCompleted(ctx context.Context, log *et
 	if err = tq.WhereProjectId(project.Id).WhereEpochLt(withdrawalEpoch).Delete(); err != nil {
 		return fmt.Errorf("failed to delete transactions for project #%d: %v", project.ProjectId, err)
 	}
+	return nil
+}
+
+// handleInvalidWithdrawalAmount is an event handler for the InvalidWithdrawalAmount event.
+func (bld *blkDispatcher) handleInvalidWithdrawalAmount(_ context.Context, log *eth.Log, _ *db.Db) error {
+	if len(log.Data) != 96 || len(log.Topics) != 2 {
+		return nil
+	}
+	// parse event data
+	eventData := make(map[string]interface{})
+	err := bld.repo.GasMonetizationAbi().UnpackIntoMap(eventData, "InvalidWithdrawalAmount", log.Data)
+	if err != nil {
+		return fmt.Errorf("failed to unpack InvalidWithdrawalAmount event #%d/#%d: %v", log.BlockNumber, log.Index, err)
+	}
+	projectId := log.Topics[1].Big().Uint64()
+	epoch := eventData["withdrawalEpochNumber"].(*big.Int).Uint64()
+	amount := eventData["amount"].(*big.Int)
+	diffAmount := eventData["diffAmount"].(*big.Int)
+	// notify error
+	bld.sendNotification(fmt.Sprintf("Invalid withdrawal amount for project #%d: %s (epoch #%d, diff %s)", projectId, amount, epoch, diffAmount))
 	return nil
 }
 
